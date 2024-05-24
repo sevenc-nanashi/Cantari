@@ -9,7 +9,7 @@ static LIB_NAME: &str = if cfg!(target_os = "windows") {
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     let cpp_path = format!(
-        "{}/external/OpenUtau/cpp",
+        "{}/OpenUtau/cpp",
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
     );
     eprintln!("Building cpp code in {}", cpp_path);
@@ -24,14 +24,10 @@ fn main() {
         std::process::exit(0);
     }
 
-    let out_dir = format!(
-        "{}/target/{}",
-        std::env::var("CARGO_MANIFEST_DIR").unwrap(),
-        std::env::var("PROFILE").unwrap()
-    );
+    let out_dir = format!("{}/../../../", std::env::var("OUT_DIR").unwrap(),);
 
     let out_lib_path = format!(
-        "{}/external/OpenUtau/cpp/bazel-bin/worldline/{}",
+        "{}/OpenUtau/cpp/bazel-bin/worldline/{}",
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         LIB_NAME
     );

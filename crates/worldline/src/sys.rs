@@ -100,11 +100,11 @@ extern "C" {
 
     pub fn PhraseSynthSetCurves(
         phrase_synth: *mut PhraseSynth,
-        f0: *mut c_double,
-        gender: *mut c_double,
-        tension: *mut c_double,
-        breathiness: *mut c_double,
-        voicing: *mut c_double,
+        f0: *const c_double,
+        gender: *const c_double,
+        tension: *const c_double,
+        breathiness: *const c_double,
+        voicing: *const c_double,
         length: c_int,
         logCallback: LogCallback,
     );

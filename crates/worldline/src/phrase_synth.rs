@@ -20,17 +20,18 @@ impl PhraseSynth {
 
     pub fn add_request(
         &mut self,
-        request: &sys::SynthRequest,
+        request: &crate::SynthRequest,
         pos_ms: f64,
         skip_ms: f64,
         length_ms: f64,
         fade_in_ms: f64,
         fade_out_ms: f64,
     ) {
+        let c_request = request.into_sys();
         unsafe {
             sys::PhraseSynthAddRequest(
                 self.inner,
-                request,
+                &c_request,
                 pos_ms,
                 skip_ms,
                 length_ms,
@@ -43,20 +44,20 @@ impl PhraseSynth {
 
     pub fn set_curves(
         &mut self,
-        f0: &mut [f64],
-        gender: &mut [f64],
-        tension: &mut [f64],
-        breathiness: &mut [f64],
-        voicing: &mut [f64],
+        f0: &[f64],
+        gender: &[f64],
+        tension: &[f64],
+        breathiness: &[f64],
+        voicing: &[f64],
     ) {
         unsafe {
             sys::PhraseSynthSetCurves(
                 self.inner,
-                f0.as_mut_ptr(),
-                gender.as_mut_ptr(),
-                tension.as_mut_ptr(),
-                breathiness.as_mut_ptr(),
-                voicing.as_mut_ptr(),
+                f0.as_ptr(),
+                gender.as_ptr(),
+                tension.as_ptr(),
+                breathiness.as_ptr(),
+                voicing.as_ptr(),
                 f0.len() as i32,
                 log_callback,
             );
@@ -66,8 +67,8 @@ impl PhraseSynth {
     pub fn synth(&mut self) -> Vec<f32> {
         let mut y = std::ptr::null_mut();
         unsafe {
-            sys::PhraseSynthSynth(self.inner, &mut y, log_callback);
-            let y = std::slice::from_raw_parts(y, 0);
+            let len = sys::PhraseSynthSynth(self.inner, &mut y, log_callback) as usize;
+            let y = std::slice::from_raw_parts(y, len);
             y.to_vec()
         }
     }

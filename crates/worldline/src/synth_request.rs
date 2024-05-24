@@ -5,7 +5,7 @@ use super::sys;
 pub struct SynthRequest {
     pub sample_fs: i32,
     pub sample: Vec<f64>,
-    pub frq: String,
+    pub frq: Vec<u8>,
     pub tone: i32,
     pub con_vel: f64,
     pub offset: f64,
@@ -25,14 +25,13 @@ pub struct SynthRequest {
 }
 
 impl SynthRequest {
-    pub fn into_sys(self) -> sys::SynthRequest {
-        let frq = CString::new(self.frq.clone()).unwrap();
+    pub fn into_sys(&self) -> sys::SynthRequest {
         sys::SynthRequest {
             sample_fs: self.sample_fs,
             sample_length: self.sample.len() as i32,
             sample: self.sample.as_ptr(),
-            frq_length: frq.as_bytes().len() as i32,
-            frq: frq.as_ptr() as _,
+            frq_length: self.frq.len() as i32,
+            frq: self.frq.as_ptr() as *const i8,
             tone: self.tone,
             con_vel: self.con_vel,
             offset: self.offset,
