@@ -1,5 +1,3 @@
-use std::ffi::CString;
-
 use super::sys;
 #[derive(Debug, Clone)]
 pub struct SynthRequest {

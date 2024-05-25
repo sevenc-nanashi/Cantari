@@ -1,4 +1,0 @@
-type=voiceset
-folder=つくよみちゃんUTAU音源
-contentsdir=つくよみちゃんUTAU音源
-description=フリー素材キャラクター「つくよみちゃん」の公式UTAU音源です。ダウンロードしていただきましてありがとうございます！

@@ -1,11 +1,11 @@
 extern crate worldline;
 use regex_macro::regex;
 use std::io::Read;
-use tyc_utau::CVC_B3_ROOT;
 use worldline::SynthRequest;
 
 #[test]
 fn test_synth() {
+    let cvc_b3_root = assets::tyc_utau().join("つくよみちゃんUTAU音源/多音階01：_B3（連続音）");
     let mut synth = worldline::PhraseSynth::new();
 
     tracing_subscriber::fmt()
@@ -13,15 +13,15 @@ fn test_synth() {
         .with_ansi(true)
         .init();
 
-    let file = std::fs::File::open(format!("{}/_ああR.wav", CVC_B3_ROOT)).unwrap();
+    let file = std::fs::File::open(cvc_b3_root.join("_ああR.wav")).unwrap();
     let (header, data) = wav_io::read_from_file(file).unwrap();
 
-    let mut frq_file = std::fs::File::open(format!("{}/_ああR_wav.frq", CVC_B3_ROOT)).unwrap();
+    let mut frq_file = std::fs::File::open(cvc_b3_root.join("_ああR_wav.frq")).unwrap();
     let mut frq = Vec::new();
     frq_file.read_to_end(&mut frq).unwrap();
 
     let mut oto_ini = Vec::new();
-    let mut oto_ini_file = std::fs::File::open(format!("{}/oto.ini", CVC_B3_ROOT)).unwrap();
+    let mut oto_ini_file = std::fs::File::open(cvc_b3_root.join("oto.ini")).unwrap();
     oto_ini_file.read_to_end(&mut oto_ini).unwrap();
     let oto_ini = encoding_rs::SHIFT_JIS.decode(&oto_ini).0;
 

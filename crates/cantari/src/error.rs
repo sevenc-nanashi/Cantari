@@ -13,6 +13,10 @@ pub enum Error {
     GetCharacterFailed(#[from] anyhow::Error),
     #[error("キャラクターが見つかりませんでした")]
     CharacterNotFound,
+    #[error("Voicevox Coreの初期化に失敗しました")]
+    VoicevoxCoreInitializeFailed(#[source] anyhow::Error),
+    #[error("推論に失敗しました")]
+    InferenceFailed(#[source] anyhow::Error),
     #[error("設定をパースできませんでした")]
     SettingsParseFailed(#[source] anyhow::Error),
     #[error("辞書を書き込めませんでした")]

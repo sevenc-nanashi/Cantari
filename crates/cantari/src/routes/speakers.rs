@@ -6,6 +6,8 @@ use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::audio_query::SYNTHESIZER;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VvSpeaker {
     pub name: String,
@@ -95,8 +97,4 @@ pub async fn get_speaker_info(
     };
 
     Ok(Json(info))
-}
-
-pub async fn get_is_initialized_speaker() -> Json<bool> {
-    Json(true)
 }

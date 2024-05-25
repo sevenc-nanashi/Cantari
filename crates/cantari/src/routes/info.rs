@@ -99,19 +99,14 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
     dependency_licenses.extend(external_licenses);
     Json(EngineManifest {
         manifest_version: "0.13.1".to_string(),
-        name: "AIVoice to Voicevox bridge".to_string(),
-        brand_name: "AIVoiceVox".to_string(),
+        name: "UTAU to Voicevox bridge".to_string(),
+        brand_name: "Cantari".to_string(),
         uuid: "14f4bd0b-99ac-48cc-8171-d93439f16b33".to_string(),
-        url: "https://github.com/sevenc-nanashi/aivoice-vox".to_string(),
+        url: "https://github.com/sevenc-nanashi/cantari".to_string(),
         icon,
         default_sampling_rate: 48000,
-        terms_of_service: "[A.I.VOICE Editor API 利用規約](https://aivoice.jp/manual/editor/api.html#termsandconditions) を参照してください。".to_string(),
+        terms_of_service: "音源の規約に従って下さい。".to_string(),
         update_infos: vec![
-            UpdateInfo {
-                version: "0.1.1".to_string(),
-                descriptions: vec!["Recotte Studioに対応".to_string()],
-                contributors: vec!["sevenc-nanashi".to_string()],
-            },
             UpdateInfo {
                 version: "0.1.0".to_string(),
                 descriptions: vec!["初期リリース".to_string()],
@@ -120,8 +115,8 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
         ],
         dependency_licenses,
         supported_features: SupportedFeatures {
-            adjust_mora_pitch: false,
-            adjust_phoneme_length: false,
+            adjust_mora_pitch: true,
+            adjust_phoneme_length: true,
             adjust_speed_scale: true,
             adjust_pitch_scale: true,
             adjust_intonation_scale: true,

@@ -4,4 +4,4 @@ resolver = "2"
 
 [workspace.dependencies]
 worldline = { path = "./crates/worldline" }
-tyc_utau = { path = "./crates/tyc_utau" }
+assets = { path = "./crates/assets" }

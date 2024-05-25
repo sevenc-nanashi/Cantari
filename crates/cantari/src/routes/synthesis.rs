@@ -1,5 +1,5 @@
-use super::audio_query::AudioQuery;
-use crate::error::Result;
+use super::audio_query::HttpAudioQuery;
+use crate::{error::Result, model::AudioQueryModel};
 
 use axum::{extract::Query, Json};
 use serde::Deserialize;
@@ -11,7 +11,10 @@ pub struct AudioQueryQuery {
 
 pub async fn post_synthesis(
     Query(query): Query<AudioQueryQuery>,
-    Json(audio_query): Json<AudioQuery>,
+    Json(audio_query): Json<HttpAudioQuery>,
 ) -> Result<Vec<u8>> {
+    let audio_query: AudioQueryModel = (&audio_query).into();
+    let synthesizer = worldline::PhraseSynth::new();
+
     todo!()
 }

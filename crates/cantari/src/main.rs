@@ -3,6 +3,7 @@ mod frq;
 mod routes;
 mod settings;
 mod ongen;
+mod model;
 
 use anyhow::Result;
 use axum::{
@@ -60,7 +61,27 @@ async fn main_impl(args: Cli) -> Result<()> {
         .route("/speaker_info", get(routes::speakers::get_speaker_info))
         .route(
             "/is_initialized_speaker",
-            get(routes::speakers::get_is_initialized_speaker),
+            get(routes::audio_query::get_is_initialized_speaker),
+        )
+        .route(
+            "/initialize_speaker",
+            post(routes::audio_query::post_initialize_speaker),
+        )
+        .route(
+            "/mora_data",
+            post(routes::audio_query::post_mora_data),
+        )
+        .route(
+            "/mora_pitch",
+            post(routes::audio_query::post_mora_pitch),
+        )
+        .route(
+            "/mora_length",
+            post(routes::audio_query::post_mora_length),
+        )
+        .route(
+            "/synthesis",
+            post(routes::synthesis::post_synthesis),
         )
         .route("/user_dict", get(routes::user_dict::get_user_dict))
         .route(

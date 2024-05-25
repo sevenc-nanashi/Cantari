@@ -16,7 +16,7 @@ duct = "0.13.7"
 
 [dev-dependencies]
 wav_io = "0.1.14"
-tyc_utau.workspace = true
+assets.workspace = true
 encoding_rs = "0.8.34"
 regex = "1.10.4"
 regex-macro = "0.2.0"

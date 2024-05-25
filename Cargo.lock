@@ -133,6 +133,9 @@ name = "arbitrary"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d5a26814d8dcb93b0e5a0ff3c6d80a8843bafb21b39e8e18a6f05471870e110"
+dependencies = [
+ "derive_arbitrary",
+]
 
 [[package]]
 name = "arg_enum_proc_macro"
@@ -150,6 +153,19 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+
+[[package]]
+name = "assets"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "rc-zip",
+ "rc-zip-sync",
+ "tar",
+ "ureq",
+ "walkdir",
+ "zip 2.0.0",
+]
 
 [[package]]
 name = "async-compression"
@@ -436,11 +452,14 @@ name = "cantari"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "assets",
  "axum",
  "base64 0.21.7",
+ "camino",
  "cargo-license",
  "clap 4.5.4",
  "dirs",
+ "duplicate",
  "encoding_rs",
  "image",
  "once_cell",
@@ -455,7 +474,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tyc_utau",
  "uuid",
  "voicevox_core",
  "wav_io",
@@ -695,6 +713,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
+name = "constant_time_eq"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -714,6 +738,21 @@ checksum = "53fe5e26ff1b7aef8bca9c6080520cfb8d9333c7568e1829cef191a9723e5504"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crc"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69e6e4d7b33a94f0991c26729976b10ebde1d34c3ee82408fb536164fa10d636"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crc32fast"
@@ -822,6 +861,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deflate64"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83ace6c86376be0b6cdcf3fb41882e81d94b31587573d1cfa9d01cd06bba210d"
+
+[[package]]
 name = "deranged"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -851,6 +896,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67e77553c4162a157adbf834ebae5b415acbecbeafc7a74b0e886657506a7611"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -896,6 +952,17 @@ dependencies = [
  "option-ext",
  "redox_users",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "displaydoc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -1677,6 +1744,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lockfree-object-pool"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9374ef4228402d4b7e403e5838cb880d9ee663314b0a900d5a6aabf0c213552e"
+
+[[package]]
 name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1689,6 +1762,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fae87c125b03c1d2c0150c90365d7d6bcc53fb73a9acaef207d2d065860f062"
 dependencies = [
  "imgref",
+]
+
+[[package]]
+name = "lzma-rs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297e814c836ae64db86b36cf2a557ba54368d03f6afcd7d947c266692f71115e"
+dependencies = [
+ "byteorder",
+ "crc",
 ]
 
 [[package]]
@@ -1754,15 +1837,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "nanoid"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
-dependencies = [
- "rand",
 ]
 
 [[package]]
@@ -2106,6 +2180,16 @@ dependencies = [
  "hmac",
  "password-hash",
  "sha2",
+]
+
+[[package]]
+name = "pbkdf2"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
+dependencies = [
+ "digest",
+ "hmac",
 ]
 
 [[package]]
@@ -2647,6 +2731,15 @@ name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
+name = "same-file"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
+dependencies = [
+ "winapi-util",
+]
 
 [[package]]
 name = "scopeguard"
@@ -3287,15 +3380,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
-name = "tyc_utau"
-version = "0.1.0"
-dependencies = [
- "rc-zip",
- "rc-zip-sync",
- "ureq",
-]
-
-[[package]]
 name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3436,7 +3520,7 @@ dependencies = [
 [[package]]
 name = "voicevox_core"
 version = "0.0.0"
-source = "git+https://github.com/voicevox/voicevox_core.git?rev=9c3a94e#9c3a94e663263595e9e9df0c0b763620c0e1615c"
+source = "git+https://github.com/voicevox/voicevox_core.git?rev=be8d0c0#be8d0c065fb8a0da442062e605d3b7b583398ecc"
 dependencies = [
  "anyhow",
  "async_zip",
@@ -3454,7 +3538,6 @@ dependencies = [
  "indexmap 2.2.6",
  "itertools 0.10.5",
  "jlabel",
- "nanoid",
  "ndarray",
  "once_cell",
  "open_jtalk",
@@ -3474,18 +3557,28 @@ dependencies = [
  "voicevox-ort",
  "voicevox_core_macros",
  "windows",
- "zip",
+ "zip 0.6.6",
 ]
 
 [[package]]
 name = "voicevox_core_macros"
 version = "0.0.0"
-source = "git+https://github.com/voicevox/voicevox_core.git?rev=9c3a94e#9c3a94e663263595e9e9df0c0b763620c0e1615c"
+source = "git+https://github.com/voicevox/voicevox_core.git?rev=be8d0c0#be8d0c065fb8a0da442062e605d3b7b583398ecc"
 dependencies = [
  "indexmap 2.2.6",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "walkdir"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
+dependencies = [
+ "same-file",
+ "winapi-util",
 ]
 
 [[package]]
@@ -3859,13 +3952,13 @@ name = "worldline"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "assets",
  "duct",
  "encoding_rs",
  "regex",
  "regex-macro",
  "tracing",
  "tracing-subscriber",
- "tyc_utau",
  "wav_io",
 ]
 
@@ -3891,6 +3984,20 @@ name = "zeroize"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "525b4ec142c6b68a2d10f01f7bbf6755599ca3f81ea53b8431b7dd348f5fdb2d"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.66",
+]
 
 [[package]]
 name = "zip"
@@ -3901,15 +4008,57 @@ dependencies = [
  "aes",
  "byteorder",
  "bzip2",
- "constant_time_eq",
+ "constant_time_eq 0.1.5",
  "crc32fast",
  "crossbeam-utils",
  "flate2",
  "hmac",
- "pbkdf2",
+ "pbkdf2 0.11.0",
  "sha1",
  "time",
- "zstd",
+ "zstd 0.11.2+zstd.1.5.2",
+]
+
+[[package]]
+name = "zip"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fccb210625924ecbbe92f9bb497d04b167b64fe5540cec75f10b16e0c51ee92b"
+dependencies = [
+ "aes",
+ "arbitrary",
+ "bzip2",
+ "constant_time_eq 0.3.0",
+ "crc32fast",
+ "crossbeam-utils",
+ "deflate64",
+ "displaydoc",
+ "flate2",
+ "hmac",
+ "indexmap 2.2.6",
+ "lzma-rs",
+ "pbkdf2 0.12.2",
+ "rand",
+ "sha1",
+ "thiserror",
+ "time",
+ "zeroize",
+ "zopfli",
+ "zstd 0.13.1",
+]
+
+[[package]]
+name = "zopfli"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5019f391bac5cf252e93bbcc53d039ffd62c7bfb7c150414d61369afe57e946"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "lockfree-object-pool",
+ "log",
+ "once_cell",
+ "simd-adler32",
 ]
 
 [[package]]
@@ -3918,7 +4067,16 @@ version = "0.11.2+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20cc960326ece64f010d2d2107537f26dc589a6573a316bd5b1dba685fa5fde4"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 5.0.2+zstd.1.5.2",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d789b1514203a1120ad2429eae43a7bd32b90976a7bb8a05f7ec02fa88cc23a"
+dependencies = [
+ "zstd-safe 7.1.0",
 ]
 
 [[package]]
@@ -3928,6 +4086,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d2a5585e04f9eea4b2a3d1eca508c4dee9592a89ef6f450c11719da0726f4db"
 dependencies = [
  "libc",
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cd99b45c6bc03a018c8b8a86025678c87e55526064e38f9df301989dce7ec0a"
+dependencies = [
  "zstd-sys",
 ]
 

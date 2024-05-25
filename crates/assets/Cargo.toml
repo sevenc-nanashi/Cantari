@@ -1,0 +1,16 @@
+[package]
+name = "assets"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+
+[build-dependencies]
+flate2 = "1.0.30"
+tar = "0.4.40"
+ureq = "2.9.7"
+rc-zip = "5.1.0"
+rc-zip-sync = "4.1.0"
+zip = "2.0.0"
+walkdir = "2.5.0"
