@@ -2,5 +2,5 @@
 	path = crates/worldline/OpenUtau
 	url = https://github.com/stakira/OpenUtau.git
 [submodule "crates/loquor/voicevox_core"]
-	path = crates/loquor/voicevox_core
+	path = crates/cantari/voicevox_core
 	url = https://github.com/voicevox/voicevox_core.git

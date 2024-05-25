@@ -432,6 +432,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "cantari"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64 0.21.7",
+ "cargo-license",
+ "clap 4.5.4",
+ "dirs",
+ "encoding_rs",
+ "image",
+ "once_cell",
+ "open",
+ "process_path",
+ "regex",
+ "regex-macro",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "tyc_utau",
+ "uuid",
+ "voicevox_core",
+ "wav_io",
+ "worldline",
+]
+
+[[package]]
 name = "cargo-license"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1658,37 +1689,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fae87c125b03c1d2c0150c90365d7d6bcc53fb73a9acaef207d2d065860f062"
 dependencies = [
  "imgref",
-]
-
-[[package]]
-name = "loquor"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "axum",
- "base64 0.21.7",
- "cargo-license",
- "clap 4.5.4",
- "dirs",
- "encoding_rs",
- "image",
- "once_cell",
- "open",
- "process_path",
- "regex",
- "regex-macro",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "tyc_utau",
- "uuid",
- "voicevox_core",
- "wav_io",
- "worldline",
 ]
 
 [[package]]

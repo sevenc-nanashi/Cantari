@@ -6,9 +6,9 @@ use tracing::error;
 
 fn get_path() -> PathBuf {
     let name = if cfg!(feature = "release") {
-        "loquor.json"
+        "cantari.json"
     } else {
-        "loquor-dev.json"
+        "cantari-dev.json"
     };
 
     let home = dirs::home_dir().unwrap();

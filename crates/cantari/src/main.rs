@@ -112,5 +112,5 @@ async fn main_impl(args: Cli) -> Result<()> {
 }
 
 async fn get_index() -> impl IntoResponse {
-    Redirect::permanent("https://github.com/sevenc-nanashi/loquor")
+    Redirect::permanent("https://github.com/sevenc-nanashi/cantari")
 }
