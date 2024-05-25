@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("キャラクターの取得に失敗しました")]
     GetCharacterFailed(#[from] anyhow::Error),
+    #[error("キャラクターが見つかりませんでした")]
+    CharacterNotFound,
     #[error("設定をパースできませんでした")]
     SettingsParseFailed(#[source] anyhow::Error),
     #[error("辞書を書き込めませんでした")]

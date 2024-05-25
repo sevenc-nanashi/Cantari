@@ -6,9 +6,9 @@ use tracing::error;
 
 fn get_path() -> PathBuf {
     let name = if cfg!(feature = "release") {
-        "vv-neutrino.json"
+        "loquor.json"
     } else {
-        "vv-neutrino-dev.json"
+        "loquor-dev.json"
     };
 
     let home = dirs::home_dir().unwrap();
@@ -23,9 +23,9 @@ pub enum Settings {
     V1(V1Settings),
 }
 
-#[derive(Debug, Clone,  Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct V1Settings {
-    pub neutrino_path: String,
+    pub paths: Vec<String>,
 }
 
 async fn load_settings_inner() -> Result<Settings> {
@@ -48,7 +48,10 @@ pub async fn load_settings() -> V1Settings {
         error!("Using default settings");
 
         Settings::V1(V1Settings {
-            neutrino_path: "/mnt/e/NEUTRINO".to_string(),
+            paths: vec![
+                "/mnt/e/utau/つくよみちゃんUTAU音源".to_string(),
+                "/mnt/e/utau/足立レイver3.1.2(単独音)".to_string(),
+            ],
         })
     });
 

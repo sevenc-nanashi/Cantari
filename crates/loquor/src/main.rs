@@ -2,6 +2,7 @@ mod error;
 mod frq;
 mod routes;
 mod settings;
+mod ongen;
 
 use anyhow::Result;
 use axum::{
@@ -13,6 +14,8 @@ use clap::Parser;
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace};
 use tracing::{info, Level};
+
+use crate::ongen::setup_ongen;
 
 #[derive(Debug, Parser)]
 #[clap(
@@ -90,13 +93,7 @@ async fn main_impl(args: Cli) -> Result<()> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
 
-    info!("Speakers:");
-    {
-        // let singers = get_singers().await?;
-        // for singer in singers.values() {
-        //     info!("- {} ({})", singer.name, singer.uuid);
-        // }
-    }
+    setup_ongen().await;
 
     info!("Starting server...");
 

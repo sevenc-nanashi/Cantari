@@ -1,8 +1,10 @@
 use crate::error::{Error, ErrorResponse, Result};
+use crate::ongen::ONGEN;
 
-use axum::{http::StatusCode, response::IntoResponse, Json, extract::Query};
+use axum::{extract::Query, http::StatusCode, response::IntoResponse, Json};
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VvSpeaker {
@@ -40,16 +42,59 @@ pub struct VvStyle {
 }
 
 pub async fn get_speakers() -> Result<Json<Vec<VvSpeaker>>> {
-    todo!()
+    let ongens = ONGEN.get().unwrap().read().await;
+
+    let mut speakers = Vec::new();
+
+    for speaker in ongens.values() {
+        let speaker = VvSpeaker {
+            name: speaker.name().clone(),
+            speaker_uuid: speaker.uuid.to_string(),
+            styles: vec![VvStyle {
+                name: "ノーマル".to_string(),
+                id: speaker.id(),
+                r#type: "talk".to_string(),
+            }],
+            version: "N/A".to_string(),
+        };
+
+        speakers.push(speaker);
+    }
+
+    Ok(Json(speakers))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SpeakerInfoQuery {
-    pub speaker_uuid: String,
+    pub speaker_uuid: Uuid,
 }
 
-pub async fn get_speaker_info(Query(query): axum::extract::Query<SpeakerInfoQuery>) -> Result<Json<VvSpeakerInfo>> {
-    todo!()
+pub async fn get_speaker_info(
+    Query(query): axum::extract::Query<SpeakerInfoQuery>,
+) -> Result<Json<VvSpeakerInfo>> {
+    let ongens = ONGEN.get().unwrap().read().await;
+
+    let speaker = ongens
+        .get(&query.speaker_uuid)
+        .ok_or_else(|| Error::CharacterNotFound)?;
+
+    let image = speaker
+        .read_image()
+        .await
+        .unwrap_or_else(|| include_bytes!("../icon.png").to_vec());
+
+    let info = VvSpeakerInfo {
+        policy: "N/A".to_string(),
+        portrait: base64::engine::general_purpose::STANDARD.encode(&image),
+        style_infos: vec![VvStyleInfo {
+            id: speaker.id(),
+            icon: base64::engine::general_purpose::STANDARD.encode(&image),
+            portrait: base64::engine::general_purpose::STANDARD.encode(&image),
+            voice_samples: vec![],
+        }],
+    };
+
+    Ok(Json(info))
 }
 
 pub async fn get_is_initialized_speaker() -> Json<bool> {

@@ -1,8 +1,14 @@
 use crate::error::Result;
+use std::sync::Arc;
+use tokio::sync::OnceCell;
 
 use axum::{extract::Query, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
+use voicevox_core::tokio::OpenJtalk;
+
+pub static SYNTHESIZER: OnceCell<Arc<voicevox_core::tokio::Synthesizer<OpenJtalk>>> =
+    OnceCell::const_new();
 
 #[derive(Debug, Deserialize)]
 pub struct AudioQueryParams {
@@ -14,7 +20,7 @@ pub struct AudioQueryParams {
 #[serde(rename_all = "camelCase")]
 pub struct AudioQuery {
     #[serde(rename = "accent_phrases")]
-    pub accent_phrases: Vec<i32>,
+    pub accent_phrases: Vec<voicevox_core::AccentPhraseModel>,
     pub speed_scale: f32,
     pub pitch_scale: f32,
     pub intonation_scale: f32,

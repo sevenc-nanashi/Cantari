@@ -49,10 +49,11 @@ impl Frq {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tyc_utau::CVC_B3_ROOT;
 
     #[test]
     fn test_parse() {
-        let frq = include_bytes!("./test.frq");
-        Frq::parse(frq).unwrap();
+        let frq = std::fs::read(format!("{}/_ああR_wav.frq", CVC_B3_ROOT)).unwrap();
+        Frq::parse(&frq).unwrap();
     }
 }
