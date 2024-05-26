@@ -5,12 +5,15 @@ use axum::{
 };
 use serde::Serialize;
 use thiserror::Error;
+use tracing::error;
 
 #[derive(Error, Debug)]
 #[allow(dead_code, clippy::enum_variant_names)]
 pub enum Error {
-    #[error("キャラクターの取得に失敗しました")]
-    GetCharacterFailed(#[from] anyhow::Error),
+    #[error("エラーが発生しました")]
+    Internal(#[from] anyhow::Error),
+    #[error("キャラクターのロードに失敗しました")]
+    CharacterGetFailed,
     #[error("キャラクターが見つかりませんでした")]
     CharacterNotFound,
     #[error("Voicevox Coreの初期化に失敗しました")]
@@ -43,6 +46,7 @@ pub struct ErrorResponse {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
+        error!("Error: {}", self);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(&ErrorResponse {

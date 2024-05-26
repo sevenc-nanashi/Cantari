@@ -5,6 +5,9 @@ pub struct PhraseSynth {
     inner: *mut sys::PhraseSynth,
 }
 
+unsafe impl Send for PhraseSynth {}
+unsafe impl Sync for PhraseSynth {}
+
 impl Default for PhraseSynth {
     fn default() -> Self {
         Self::new()

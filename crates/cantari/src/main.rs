@@ -1,9 +1,11 @@
 mod error;
-mod frq;
+mod math;
+mod model;
+mod ongen;
+mod oto;
 mod routes;
 mod settings;
-mod ongen;
-mod model;
+mod tempdir;
 
 use anyhow::Result;
 use axum::{
@@ -16,7 +18,7 @@ use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace};
 use tracing::{info, Level};
 
-use crate::ongen::setup_ongen;
+use crate::{ongen::setup_ongen, tempdir::TEMPDIR};
 
 #[derive(Debug, Parser)]
 #[clap(
@@ -67,22 +69,10 @@ async fn main_impl(args: Cli) -> Result<()> {
             "/initialize_speaker",
             post(routes::audio_query::post_initialize_speaker),
         )
-        .route(
-            "/mora_data",
-            post(routes::audio_query::post_mora_data),
-        )
-        .route(
-            "/mora_pitch",
-            post(routes::audio_query::post_mora_pitch),
-        )
-        .route(
-            "/mora_length",
-            post(routes::audio_query::post_mora_length),
-        )
-        .route(
-            "/synthesis",
-            post(routes::synthesis::post_synthesis),
-        )
+        .route("/mora_data", post(routes::audio_query::post_mora_data))
+        .route("/mora_pitch", post(routes::audio_query::post_mora_pitch))
+        .route("/mora_length", post(routes::audio_query::post_mora_length))
+        .route("/synthesis", post(routes::synthesis::post_synthesis))
         .route("/user_dict", get(routes::user_dict::get_user_dict))
         .route(
             "/import_user_dict",
@@ -116,6 +106,12 @@ async fn main_impl(args: Cli) -> Result<()> {
 
     setup_ongen().await;
 
+    if TEMPDIR.exists() {
+        tokio::fs::remove_dir_all(TEMPDIR.as_path()).await?;
+    }
+    tokio::fs::create_dir_all(TEMPDIR.as_path()).await?;
+    info!("Created tempdir: {}", TEMPDIR.as_path().display());
+
     info!("Starting server...");
 
     info!("Listening on port {}", args.port);
@@ -128,6 +124,8 @@ async fn main_impl(args: Cli) -> Result<()> {
                 .expect("failed to install CTRL+C signal handler");
         })
         .await?;
+
+    tokio::fs::remove_dir_all(TEMPDIR.as_path()).await?;
 
     Ok(())
 }
