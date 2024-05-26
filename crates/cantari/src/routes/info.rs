@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, response::IntoResponse, Json};
+use axum::{response::IntoResponse, Json};
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 
@@ -106,13 +106,11 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
         icon,
         default_sampling_rate: 48000,
         terms_of_service: "音源の規約に従って下さい。".to_string(),
-        update_infos: vec![
-            UpdateInfo {
-                version: "0.1.0".to_string(),
-                descriptions: vec!["初期リリース".to_string()],
-                contributors: vec!["sevenc-nanashi".to_string()],
-            }
-        ],
+        update_infos: vec![UpdateInfo {
+            version: "0.1.0".to_string(),
+            descriptions: vec!["初期リリース".to_string()],
+            contributors: vec!["sevenc-nanashi".to_string()],
+        }],
         dependency_licenses,
         supported_features: SupportedFeatures {
             adjust_mora_pitch: true,

@@ -37,9 +37,6 @@ struct PhraseSource<'a> {
     accent_phrase: &'a AccentPhraseModel,
     ongen: &'a crate::ongen::Ongen,
     speaker: u32,
-    speed_scale: f32,
-    pitch_scale: f32,
-    intonation_scale: f32,
     volume_scale: f32,
     cvvc_connect: f64,
 }
@@ -122,17 +119,16 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         moras.push(pause_mora);
     }
 
-    for (i, mora) in moras.iter().enumerate() {
+    for mora in moras.iter() {
         let freq = if mora.pitch == 0.0 {
             // 無声化は前の音高を引き継ぐ
             prev_freq
         } else {
-            (mora.pitch * 2f32.powf(source.pitch_scale)).exp()
+            mora.pitch.exp()
         };
         let kana = text_to_oto(&mora.text);
         let freq_midi = MidiNote::from_frequency(freq);
-        let length = ((mora.consonant_length.unwrap_or(0.0) + mora.vowel_length)
-            / source.speed_scale) as f64;
+        let length = ((mora.consonant_length.unwrap_or(0.0) + mora.vowel_length) as f64).max(0.035);
         let (prefix, suffix) = source
             .ongen
             .prefix_suffix_map
@@ -160,19 +156,19 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             continue;
         };
 
-        let next_oto = if i < moras.len() - 1 {
-            let next_mora = &moras[i + 1];
-            get_oto(
-                &source.ongen.oto,
-                &text_to_oto(&next_mora.text),
-                prefix,
-                suffix,
-                &mora.vowel.to_lowercase(),
-            )
-            .await
-        } else {
-            None
-        };
+        // let next_oto = if i < moras.len() - 1 {
+        //     let next_mora = &moras[i + 1];
+        //     get_oto(
+        //         &source.ongen.oto,
+        //         &text_to_oto(&next_mora.text),
+        //         prefix,
+        //         suffix,
+        //         &mora.vowel.to_lowercase(),
+        //     )
+        //     .await
+        // } else {
+        //     None
+        // };
         let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
         let skip = 0.0;
         aliases.push(oto.alias.clone());
@@ -215,16 +211,21 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         prev_freq = freq;
         prev_vowel.clone_from(&mora.vowel.to_lowercase());
     }
-    info!("Synthesizing {:?}", aliases);
+    let wav = if aliases.is_empty() {
+        warn!("No aliases found for {:?}", source.accent_phrase);
+        vec![0.0]
+    } else {
+        info!("Synthesizing {:?}", aliases);
 
-    synthesizer.set_curves(
-        &f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
-        &vec![0.5f64; f0.len()],
-        &vec![0.5f64; f0.len()],
-        &vec![0.5f64; f0.len()],
-        &vec![0.5f64; f0.len()],
-    );
-    let wav = synthesizer.synth();
+        synthesizer.set_curves(
+            &f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
+            &vec![0.5f64; f0.len()],
+            &vec![0.5f64; f0.len()],
+            &vec![0.5f64; f0.len()],
+            &vec![0.5f64; f0.len()],
+        );
+        synthesizer.synth()
+    };
 
     SynthesisResult {
         wav,
@@ -238,7 +239,11 @@ pub async fn post_synthesis(
     Query(query): Query<AudioQueryQuery>,
     Json(audio_query): Json<HttpAudioQuery>,
 ) -> Result<Vec<u8>> {
-    let audio_query: AudioQueryModel = (&audio_query).into();
+    let mut audio_query: AudioQueryModel = (&audio_query).into();
+
+    audio_query.apply_speed_scale(audio_query.speed_scale);
+    audio_query.apply_pitch_scale(audio_query.pitch_scale);
+    audio_query.apply_intonation_scale(audio_query.intonation_scale);
 
     let ongens = ONGEN.get().unwrap().read().await;
     let ongen = ongens
@@ -259,9 +264,6 @@ pub async fn post_synthesis(
             accent_phrase: &accent_phrase,
             ongen,
             speaker: query.speaker,
-            speed_scale: audio_query.speed_scale,
-            pitch_scale: audio_query.pitch_scale,
-            intonation_scale: audio_query.intonation_scale,
             volume_scale: audio_query.volume_scale,
             cvvc_connect,
         };
@@ -300,8 +302,9 @@ pub async fn post_synthesis(
             total_sum_length += pause_length as f64;
         }
     }
-    let duration =
-        total_sum_length + ((audio_query.pre_phoneme_length + audio_query.post_phoneme_length) / audio_query.speed_scale) as f64;
+    let duration = total_sum_length
+        + ((audio_query.pre_phoneme_length + audio_query.post_phoneme_length)
+            / audio_query.speed_scale) as f64;
     let mut wav = vec![0.0; (duration * worldline::SAMPLE_RATE as f64) as usize];
 
     for phrase_wave in phrase_waves {

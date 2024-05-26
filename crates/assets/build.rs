@@ -71,7 +71,7 @@ mod open_jtalk_dict {
     }
     pub fn move_dict() {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("../../../");
-        std::fs::rename("assets/dict", out_dir.join("dict")).unwrap();
+        fs_extra::dir::copy("assets/dict", out_dir.join("dict"), &Default::default()).unwrap();
     }
 }
 mod sample_vvm {
@@ -106,7 +106,7 @@ mod sample_vvm {
 
     pub fn move_vvm() {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("../../../");
-        std::fs::rename("assets/sample.vvm", out_dir.join("sample.vvm")).unwrap();
+        std::fs::copy("assets/sample.vvm", out_dir.join("sample.vvm")).unwrap();
     }
 }
 

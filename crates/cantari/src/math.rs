@@ -59,7 +59,7 @@ impl FromStr for MidiNote {
 impl std::fmt::Display for MidiNote {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let note = self.0 % 12;
-        let octave = self.0 / 12 - 1;
+        let octave: i8 = (self.0 as i8) / 12 - 1;
         let note_str = match note {
             0 => "C",
             1 => "C#",

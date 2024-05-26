@@ -1,10 +1,8 @@
 use std::path::PathBuf;
 
-static MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
 #[cfg(debug_assertions)]
 pub fn asset(path: &str) -> PathBuf {
-    PathBuf::from(MANIFEST_DIR).join("assets").join(path)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets").join(path)
 }
 
 #[cfg(not(debug_assertions))]
