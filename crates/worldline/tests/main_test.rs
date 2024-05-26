@@ -36,7 +36,7 @@ fn test_synth() {
     let req = SynthRequest {
         sample_fs: header.sample_rate as i32,
         sample: data.into_iter().map(|x| x as f64).collect(),
-        frq,
+        frq: Some(frq),
         tone: 40,
         con_vel: 100.0,
         offset: captures["offset"].parse().unwrap(),
@@ -49,10 +49,10 @@ fn test_synth() {
         pitch_bend: vec![0],
         flag_g: 0,
         flag_o: 0,
-        flag_p: 0,
+        flag_p: 86,
         flag_mt: 0,
         flag_mb: 0,
-        flag_mv: 0,
+        flag_mv: 100,
     };
 
     synth.add_request(&req, 0.0, 0.0, 900.0, 5.0, 35.0);

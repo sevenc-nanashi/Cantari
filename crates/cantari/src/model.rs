@@ -29,27 +29,33 @@ pub struct AccentPhraseModel {
 }
 
 impl AccentPhraseModel {
-    pub fn apply_speed_scale(&mut self, speed_scale: f32) {
-        for mora in &mut self.moras {
+    pub fn apply_speed_scale(&self, speed_scale: f32) -> AccentPhraseModel {
+        let mut modified = self.clone();
+        for mora in &mut modified.moras {
             mora.vowel_length /= speed_scale;
             if let Some(consonant_length) = &mut mora.consonant_length {
                 *consonant_length /= speed_scale;
             }
         }
-        if let Some(pause_mora) = &mut self.pause_mora {
+        if let Some(pause_mora) = &mut modified.pause_mora {
             pause_mora.vowel_length /= speed_scale;
             if let Some(consonant_length) = &mut pause_mora.consonant_length {
                 *consonant_length /= speed_scale;
             }
         }
+
+        modified
     }
-    pub fn apply_pitch_scale(&mut self, pitch_scale: f32) {
+    pub fn apply_pitch_scale(&self, pitch_scale: f32) -> AccentPhraseModel {
         let pitch_scale = 2.0_f32.powf(pitch_scale);
-        for mora in &mut self.moras {
+        let mut modified = self.clone();
+        for mora in &mut modified.moras {
             if mora.pitch != 0.0 {
                 mora.pitch *= pitch_scale;
             }
         }
+
+        modified
     }
 }
 
@@ -76,21 +82,36 @@ pub struct AudioQueryModel {
     pub kana: Option<String>,
 }
 impl AudioQueryModel {
-    pub fn apply_speed_scale(&mut self, speed_scale: f32) {
-        for accent_phrase in &mut self.accent_phrases {
-            accent_phrase.apply_speed_scale(speed_scale);
-        }
-        self.pre_phoneme_length /= speed_scale;
-        self.post_phoneme_length /= speed_scale;
+    pub fn apply_speed_scale(&mut self, speed_scale: f32) -> AudioQueryModel {
+        let mut modified = self.clone();
+        modified.accent_phrases = self
+            .accent_phrases
+            .iter()
+            .map(|accent_phrase| accent_phrase.apply_speed_scale(speed_scale))
+            .collect();
+        modified.pre_phoneme_length /= speed_scale;
+        modified.post_phoneme_length /= speed_scale;
+
+        modified.speed_scale = 1.0;
+
+        modified
     }
-    pub fn apply_pitch_scale(&mut self, pitch_scale: f32) {
-        for accent_phrase in &mut self.accent_phrases {
-            accent_phrase.apply_pitch_scale(pitch_scale);
-        }
+    pub fn apply_pitch_scale(&self, pitch_scale: f32) -> AudioQueryModel {
+        let mut modified = self.clone();
+        modified.accent_phrases = self
+            .accent_phrases
+            .iter()
+            .map(|accent_phrase| accent_phrase.apply_pitch_scale(pitch_scale))
+            .collect();
+
+        modified.pitch_scale = 0.0;
+
+        modified
     }
-    pub fn apply_intonation_scale(&mut self, intonation_scale: f32) {
+    pub fn apply_intonation_scale(&mut self, intonation_scale: f32) -> AudioQueryModel {
+        let mut modified = self.clone();
         let mut pitches = vec![];
-        for accent_phrase in &mut self.accent_phrases {
+        for accent_phrase in &mut modified.accent_phrases {
             for mora in &accent_phrase.moras {
                 pitches.push(mora.pitch);
             }
@@ -98,13 +119,17 @@ impl AudioQueryModel {
         let sum = pitches.iter().sum::<f32>();
         let average = sum / pitches.iter().filter(|&&pitch| pitch > 0.0).count() as f32;
 
-        for accent_phrase in &mut self.accent_phrases {
+        for accent_phrase in &mut modified.accent_phrases {
             for mora in &mut accent_phrase.moras {
                 if mora.pitch != 0.0 {
                     mora.pitch += (mora.pitch - average) * (intonation_scale - 1.0);
                 }
             }
         }
+
+        modified.intonation_scale = 1.0;
+
+        modified
     }
 }
 

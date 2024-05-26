@@ -63,33 +63,24 @@ async fn get_oto<'a>(
     suffix: &str,
     _prev_vowel: &str,
 ) -> Option<(&'a Oto, OtoData)> {
-    // TODO: 連続音に対応させる
-    // // 連続音
-    // if let Some(oto) = oto.get(format!("{}{} {}{}", prefix, prev_vowel, kana, suffix).as_str()) {
-    //     if let Ok(oto_data) = oto.read().await {
-    //         return Some((oto, oto_data.clone()));
-    //     } else {
-    //         warn!("Failed to read oto data for {:?}", oto.alias);
-    //     }
-    // };
+    let aliases = [
+        // 連続音（TODO）
+        // format!("{}{} {}{}", prefix, prev_vowel, kana, suffix),
 
-    // 単独音
-    if let Some(oto) = oto.get(format!("{}- {}{}", prefix, kana, suffix).as_str()) {
-        if let Ok(oto_data) = oto.read().await {
-            return Some((oto, oto_data.clone()));
-        } else {
-            warn!("Failed to read oto data for {:?}", oto.alias);
-        }
-    };
+        // 単独音
+        format!("{}- {}{}", prefix, kana, suffix),
+        // 単独音2
+        format!("{}{}{}", prefix, kana, suffix),
+    ];
 
-    // 単独音
-    if let Some(oto) = oto.get(format!("{}{}{}", prefix, kana, suffix).as_str()) {
-        if let Ok(oto_data) = oto.read().await {
-            return Some((oto, oto_data.clone()));
-        } else {
-            warn!("Failed to read oto data for {:?}", oto.alias);
+    for alias in aliases.iter() {
+        if let Some(oto) = oto.get(alias) {
+            match oto.read().await {
+                Ok(oto_data) => return Some((oto, oto_data.clone())),
+                Err(e) => warn!("Failed to read oto data for {:?}: {:?}", oto.alias, e),
+            }
         }
-    };
+    }
 
     None
 }
@@ -239,11 +230,10 @@ pub async fn post_synthesis(
     Query(query): Query<AudioQueryQuery>,
     Json(audio_query): Json<HttpAudioQuery>,
 ) -> Result<Vec<u8>> {
-    let mut audio_query: AudioQueryModel = (&audio_query).into();
-
-    audio_query.apply_speed_scale(audio_query.speed_scale);
-    audio_query.apply_pitch_scale(audio_query.pitch_scale);
-    audio_query.apply_intonation_scale(audio_query.intonation_scale);
+    let audio_query = AudioQueryModel::from(&audio_query)
+        .apply_speed_scale(audio_query.speed_scale)
+        .apply_pitch_scale(audio_query.pitch_scale)
+        .apply_intonation_scale(audio_query.intonation_scale);
 
     let ongens = ONGEN.get().unwrap().read().await;
     let ongen = ongens

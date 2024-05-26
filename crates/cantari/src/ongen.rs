@@ -125,8 +125,23 @@ impl Ongen {
 pub async fn setup_ongen() {
     info!("Setting up ongens...");
     let paths = load_settings().await.paths;
+
+    let mut roots = vec![];
+    for path in &paths {
+        for file in walkdir::WalkDir::new(path)
+            .min_depth(1)
+            .max_depth(2)
+            .into_iter()
+            .flatten()
+        {
+            if file.file_type().is_file() && file.file_name() == "character.txt" {
+                roots.push(file.path().parent().unwrap().to_path_buf());
+            }
+        }
+    }
+
     let mut ongens = HashMap::new();
-    for path in paths {
+    for path in roots {
         match Ongen::new(PathBuf::from(&path)).await {
             Ok(ongen) => {
                 info!(
@@ -138,7 +153,7 @@ pub async fn setup_ongen() {
                 ongens.insert(ongen.uuid, ongen);
             }
             Err(e) => {
-                warn!("Failed to load ongen at {}: {}", path, e);
+                warn!("Failed to load ongen at {:?}: {}", path, e);
             }
         }
     }

@@ -12,7 +12,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub struct OtoData {
     pub header: wav_io::header::WavHeader,
     pub samples: Vec<f64>,
-    pub frq: Vec<u8>,
+    pub frq: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,9 +116,14 @@ impl Oto {
             .get_samples_f32()
             .map_err(|e| anyhow!("Failed to read wav samples: {}", e))?;
 
-        let frq = fs_err::tokio::read(&self.frq)
-            .await
-            .map_err(|e| anyhow!("Failed to read frq file: {}", e))?;
+        let frq = match fs_err::tokio::read(&self.frq).await {
+            Ok(frq) => Some(frq),
+            Err(e) => {
+                warn!("Failed to read frq file: {}", e);
+
+                None
+            }
+        };
 
         let data = OtoData {
             header,

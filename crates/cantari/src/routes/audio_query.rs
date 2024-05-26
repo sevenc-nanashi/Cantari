@@ -11,6 +11,8 @@ use serde_json::Number;
 use tracing::info;
 use voicevox_core::{tokio::OpenJtalk, InitializeOptions};
 
+static SPEED_SCALE: f32 = 0.8;
+
 pub static SYNTHESIZER: OnceCell<Arc<voicevox_core::tokio::Synthesizer<OpenJtalk>>> =
     OnceCell::const_new();
 
@@ -84,9 +86,13 @@ pub async fn post_audio_query(
         .await
         .map_err(|e| Error::InferenceFailed(anyhow!("Failed to create audio query: {}", e)))?;
 
-    Ok(Json(HttpAudioQuery::from(
-        &crate::model::AudioQueryModel::from(&audio_query),
-    )))
+    let mut audio_query =
+        crate::model::AudioQueryModel::from(&audio_query).apply_speed_scale(SPEED_SCALE);
+
+    audio_query.pre_phoneme_length = 0.1;
+    audio_query.post_phoneme_length = 0.1;
+
+    Ok(Json(HttpAudioQuery::from(&audio_query)))
 }
 
 pub async fn post_accent_phrases(
@@ -101,16 +107,19 @@ pub async fn post_accent_phrases(
     Ok(Json(
         accent_phrases
             .iter()
-            .map(crate::model::AccentPhraseModel::from)
+            .map(|ap| {
+                let ap = crate::model::AccentPhraseModel::from(ap);
+                ap.apply_speed_scale(SPEED_SCALE)
+            })
             .collect(),
     ))
 }
 
 #[duplicate_item(
-    name               synthesizer_method;
-    [post_mora_data ]  [replace_mora_data];
-    [post_mora_pitch]  [replace_mora_pitch];
-    [post_mora_length] [replace_phoneme_length];
+    name               synthesizer_method       should_apply_speed_scale;
+    [post_mora_data ]  [replace_mora_data]      [true];
+    [post_mora_pitch]  [replace_mora_pitch]     [false];
+    [post_mora_length] [replace_phoneme_length] [true];
 )]
 pub async fn name(
     Query(query): Query<AccentPhraseModifyParams>,
@@ -127,7 +136,14 @@ pub async fn name(
     Ok(Json(
         new_accent_phrases
             .iter()
-            .map(crate::model::AccentPhraseModel::from)
+            .map(|ap| {
+                let ap = crate::model::AccentPhraseModel::from(ap);
+                if should_apply_speed_scale {
+                    ap.apply_speed_scale(SPEED_SCALE)
+                } else {
+                    ap
+                }
+            })
             .collect(),
     ))
 }

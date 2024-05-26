@@ -3,7 +3,7 @@ use super::sys;
 pub struct SynthRequest {
     pub sample_fs: i32,
     pub sample: Vec<f64>,
-    pub frq: Vec<u8>,
+    pub frq: Option<Vec<u8>>,
     pub tone: i32,
     pub con_vel: f64,
     pub offset: f64,
@@ -28,8 +28,11 @@ impl SynthRequest {
             sample_fs: self.sample_fs,
             sample_length: self.sample.len() as i32,
             sample: self.sample.as_ptr(),
-            frq_length: self.frq.len() as i32,
-            frq: self.frq.as_ptr() as *const i8,
+            frq_length: self.frq.as_ref().map_or(0, |frq| frq.len() as i32),
+            frq: self
+                .frq
+                .as_ref()
+                .map_or(std::ptr::null(), |frq| frq.as_ptr() as *const i8),
             tone: self.tone,
             con_vel: self.con_vel,
             offset: self.offset,
