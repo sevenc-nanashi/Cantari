@@ -61,26 +61,38 @@ async fn get_oto<'a>(
     kana: &str,
     prefix: &str,
     suffix: &str,
-    prev_vowel: &str,
+    _prev_vowel: &str,
 ) -> Option<(&'a Oto, OtoData)> {
-    let aliases = [
-        // // 連続音（CVVCのみ）
-        // format!(
-        //     "{}{} {}{}",
-        //     prefix,
-        //     prev_vowel,
-        //     if ["あ", "い", "う", "え", "お"].contains(&kana) {
-        //         kana
-        //     } else {
-        //         "絶対に入らないであろう音"
-        //     },
-        //     suffix
-        // ),
-        // 単独音
-        format!("{}- {}{}", prefix, kana, suffix),
-        // 単独音2
-        format!("{}{}{}", prefix, kana, suffix),
-    ];
+    // // 連続音（音質が安定しないので無効化）
+    // format!(
+    //     "{}{} {}{}",
+    //     prefix,
+    //     prev_vowel,
+    //     if ["あ", "い", "う", "え", "お"].contains(&kana) {
+    //         kana
+    //     } else {
+    //         "絶対に入らないであろう音"
+    //     },
+    //     suffix
+    // ),
+    let aliases = if kana == "お" {
+        vec![
+            // たまに「を」だけある音源があるので、それの対応。
+            // 単独音
+            format!("{}お{}", prefix, suffix),
+            format!("{}を{}", prefix, suffix),
+            // 単独音2
+            format!("{}- お{}", prefix, suffix),
+            format!("{}- を{}", prefix, suffix),
+        ]
+    } else {
+        vec![
+            // 単独音2
+            format!("{}{}{}", prefix, kana, suffix),
+            // 単独音
+            format!("{}- {}{}", prefix, kana, suffix),
+        ]
+    };
 
     for alias in aliases.iter() {
         if let Some(oto) = oto.get(alias) {
@@ -137,7 +149,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let oto: Option<(&Oto, OtoData)> =
             get_oto(&source.ongen.oto, &kana, prefix, suffix, &prev_vowel).await;
 
-        let start = sum_length;
+        let mut start = sum_length;
         sum_length += length;
         let Some((oto, oto_data)) = oto else {
             if kana == "R" {
@@ -169,18 +181,26 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         } else {
             None
         };
-        let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
+        let start = if start < 0.0 { 0.0 } else { start * 1000.0 } - oto.overlap;
         let skip = 0.0;
         aliases.push(oto.alias.clone());
 
-        let adjusted_length = length * 1000.0 + oto.overlap + 35.0;
+        let adjusted_length = length * 1000.0 +  35.0;
+
+        let con_vel = if let Some(consonant_length) = mora.consonant_length {
+            let oto_consonant_length = (oto.consonant - oto.preutter) / 1000.0;
+            let con_vel = oto_consonant_length / (consonant_length as f64);
+            100.0 * con_vel
+        } else {
+            100.0
+        };
 
         let request = SynthRequest {
             sample_fs: oto_data.header.sample_rate as i32,
             sample: oto_data.samples,
             frq: oto_data.frq,
             tone: freq_midi.0 as i32,
-            con_vel: 100.0,
+            con_vel,
             offset: oto.offset,
             required_length: adjusted_length + 100.0,
             consonant: oto.consonant,
@@ -198,6 +218,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         };
 
         synthesizer.add_request(&request, start, skip, adjusted_length, 5.0, 35.0);
+        info!("{} {}..{}", mora.text, start, start + adjusted_length);
 
         f0.extend(vec![freq; (length * 1000.0 / MS_PER_FRAME) as usize]);
 

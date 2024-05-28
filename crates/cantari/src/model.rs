@@ -82,7 +82,7 @@ pub struct AudioQueryModel {
     pub kana: Option<String>,
 }
 impl AudioQueryModel {
-    pub fn apply_speed_scale(&mut self, speed_scale: f32) -> AudioQueryModel {
+    pub fn apply_speed_scale(&self, speed_scale: f32) -> AudioQueryModel {
         let mut modified = self.clone();
         modified.accent_phrases = self
             .accent_phrases
@@ -108,7 +108,7 @@ impl AudioQueryModel {
 
         modified
     }
-    pub fn apply_intonation_scale(&mut self, intonation_scale: f32) -> AudioQueryModel {
+    pub fn apply_intonation_scale(&self, intonation_scale: f32) -> AudioQueryModel {
         let mut modified = self.clone();
         let mut pitches = vec![];
         for accent_phrase in &mut modified.accent_phrases {

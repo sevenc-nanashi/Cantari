@@ -43,6 +43,8 @@ mod tyc_utau {
 
 mod open_jtalk_dict {
     use std::path::PathBuf;
+
+    use fs_extra::dir::CopyOptions;
     pub fn download() {
         if std::fs::metadata("assets/dict.tgz").is_ok() {
             return;
@@ -71,7 +73,15 @@ mod open_jtalk_dict {
     }
     pub fn move_dict() {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("../../../");
-        fs_extra::dir::copy("assets/dict", out_dir.join("dict"), &Default::default()).unwrap();
+        fs_extra::dir::copy(
+            "assets/dict",
+            out_dir.join("dict"),
+            &CopyOptions {
+                overwrite: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
     }
 }
 mod sample_vvm {
