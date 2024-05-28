@@ -18,7 +18,7 @@ pub struct OtoData {
 #[derive(Debug, Clone)]
 enum OtoCache {
     Oto(OtoData),
-    Error,
+    Error(String),
 }
 
 static CACHE: Lazy<RwLock<HashMap<String, OtoCache>>> = Lazy::new(|| RwLock::new(HashMap::new()));
@@ -79,8 +79,15 @@ impl Oto {
         otos
     }
 
-    pub fn is_cvvc(&self) -> bool {
+    pub fn is_vcv(&self) -> bool {
         self.alias.contains(' ') && !self.alias.starts_with("- ")
+    }
+
+    pub fn is_cvvc(&self) -> bool {
+        return self.is_vcv()
+            && ["あ", "い", "う", "え", "お"]
+                .iter()
+                .any(|x| self.alias.contains(x));
     }
 
     pub async fn read(&self) -> Result<OtoData> {
@@ -89,18 +96,24 @@ impl Oto {
             if let Some(data) = cache.get(&self.alias) {
                 return match data {
                     OtoCache::Oto(data) => Ok(data.clone()),
-                    OtoCache::Error => Err(anyhow!("Failed to read oto data")),
+                    OtoCache::Error(e) => Err(anyhow!("Failed to read oto: {}", e)),
                 };
             }
         }
 
         let data = self.read_inner().await;
-        if let Ok(data) = &data {
-            let mut cache = CACHE.write().await;
-            cache.insert(self.alias.clone(), OtoCache::Oto(data.clone()));
-        } else {
-            let mut cache = CACHE.write().await;
-            cache.insert(self.alias.clone(), OtoCache::Error);
+        match &data {
+            Ok(data) => {
+                let mut cache = CACHE.write().await;
+                cache.insert(self.alias.clone(), OtoCache::Oto(data.clone()));
+            }
+            Err(err) => {
+                let mut cache = CACHE.write().await;
+                cache.insert(
+                    self.alias.clone(),
+                    OtoCache::Error(err.to_string().replace('\n', " ")),
+                );
+            }
         }
         data
     }
@@ -112,9 +125,12 @@ impl Oto {
         let header = reader
             .read_header()
             .map_err(|e| anyhow!("Failed to read wav header: {}", e))?;
-        let samples = reader
+        let mut samples = reader
             .get_samples_f32()
             .map_err(|e| anyhow!("Failed to read wav samples: {}", e))?;
+        if header.channels != 1 {
+            samples = wav_io::utils::stereo_to_mono(samples);
+        }
 
         let frq = match fs_err::tokio::read(&self.frq).await {
             Ok(frq) => Some(frq),

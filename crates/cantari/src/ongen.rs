@@ -24,8 +24,8 @@ pub struct Ongen {
 }
 
 impl Ongen {
-    #[instrument]
-    pub async fn new(root: PathBuf) -> Result<Self> {
+    #[instrument(skip(existing_uuids))]
+    pub async fn new(root: PathBuf, existing_uuids: &[&Uuid]) -> Result<Self> {
         let character_txt = root.join("character.txt");
         let character = tokio::fs::read(character_txt).await.unwrap();
         let character = encoding_rs::SHIFT_JIS.decode(&character).0;
@@ -42,6 +42,9 @@ impl Ongen {
 
         let name = info.get("name").ok_or_else(|| anyhow!("name not found"))?;
         let uuid = Uuid::new_v5(&Uuid::NAMESPACE_OID, format!("ongen:{}", name).as_bytes());
+        if existing_uuids.contains(&&uuid) {
+            bail!("Duplicate UUID: {}", uuid);
+        }
 
         let mut all_oto = HashMap::new();
 
@@ -122,6 +125,7 @@ impl Ongen {
     }
 }
 
+#[instrument]
 pub async fn setup_ongen() {
     info!("Setting up ongens...");
     let paths = load_settings().await.paths;
@@ -130,7 +134,7 @@ pub async fn setup_ongen() {
     for path in &paths {
         for file in walkdir::WalkDir::new(path)
             .min_depth(1)
-            .max_depth(2)
+            .max_depth(3)
             .into_iter()
             .flatten()
         {
@@ -142,7 +146,12 @@ pub async fn setup_ongen() {
 
     let mut ongens = HashMap::new();
     for path in roots {
-        match Ongen::new(PathBuf::from(&path)).await {
+        match Ongen::new(
+            PathBuf::from(&path),
+            ongens.keys().collect::<Vec<&Uuid>>().as_slice(),
+        )
+        .await
+        {
             Ok(ongen) => {
                 info!(
                     "Loaded ongen: {} ({}, {})",

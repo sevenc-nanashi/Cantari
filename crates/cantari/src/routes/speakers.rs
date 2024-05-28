@@ -1,12 +1,10 @@
-use crate::error::{Error, ErrorResponse, Result};
+use crate::error::{Error, Result};
 use crate::ongen::ONGEN;
 
-use axum::{extract::Query, http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::Query, Json};
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-use super::audio_query::SYNTHESIZER;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VvSpeaker {

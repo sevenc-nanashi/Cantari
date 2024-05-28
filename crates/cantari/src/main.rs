@@ -14,6 +14,7 @@ use axum::{
     Router,
 };
 use clap::Parser;
+use ongen::ONGEN;
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace};
 use tracing::{info, Level};
@@ -105,6 +106,12 @@ async fn main_impl(args: Cli) -> Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
 
     setup_ongen().await;
+    {
+        let ongens = ONGEN.get().unwrap().read().await;
+        for ongen in ongens.values() {
+            info!("- {} ({})", ongen.name(), ongen.uuid);
+        }
+    }
 
     if TEMPDIR.exists() {
         tokio::fs::remove_dir_all(TEMPDIR.as_path()).await?;

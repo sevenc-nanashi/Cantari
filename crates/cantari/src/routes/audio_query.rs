@@ -11,7 +11,7 @@ use serde_json::Number;
 use tracing::info;
 use voicevox_core::{tokio::OpenJtalk, InitializeOptions};
 
-static SPEED_SCALE: f32 = 0.8;
+static SPEED_SCALE: f32 = 1.0;
 
 pub static SYNTHESIZER: OnceCell<Arc<voicevox_core::tokio::Synthesizer<OpenJtalk>>> =
     OnceCell::const_new();
@@ -189,8 +189,8 @@ pub async fn initialize_synthesizer() {
         .await
         .expect("Failed to load VoiceModel");
 
-    if SYNTHESIZER.set(Arc::new(synthesizer)).is_err() {
-        panic!("Failed to set SYNTHESIZER");
+    if let Err(e) = SYNTHESIZER.set(Arc::new(synthesizer)) {
+        panic!("Failed to set SYNTHESIZER: {}", e);
     }
     info!("Synthesizer initialized");
 }

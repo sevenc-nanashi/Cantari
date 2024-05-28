@@ -51,7 +51,10 @@ pub async fn load_settings() -> V1Settings {
             paths: vec![
                 "/mnt/e/utau/つくよみちゃんUTAU音源".to_string(),
                 "/mnt/e/utau/足立レイver3.1.2(単独音)".to_string(),
-                "/mnt/c/Users/katama/AppData/Roaming/UTAU/voice".to_string(),
+                "/mnt/e/utau".to_string(),
+                "/mnt/e/OpenUtau/Singers".to_string(),
+                "/mnt/e/OpenUtau-dev/OpenUtau/bin/Debug/net6.0-windows/Singers".to_string(),
+                "/mnt/e/OpenUtau-dev/OpenUtau/bin/Release/net6.0-windows/Singers".to_string(),
             ],
         })
     });

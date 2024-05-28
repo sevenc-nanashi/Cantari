@@ -38,7 +38,7 @@ struct PhraseSource<'a> {
     ongen: &'a crate::ongen::Ongen,
     speaker: u32,
     volume_scale: f32,
-    cvvc_connect: f64,
+    vcv_connect: f64,
 }
 
 impl PhraseSource<'_> {
@@ -61,12 +61,21 @@ async fn get_oto<'a>(
     kana: &str,
     prefix: &str,
     suffix: &str,
-    _prev_vowel: &str,
+    prev_vowel: &str,
 ) -> Option<(&'a Oto, OtoData)> {
     let aliases = [
-        // 連続音（TODO）
-        // format!("{}{} {}{}", prefix, prev_vowel, kana, suffix),
-
+        // // 連続音（CVVCのみ）
+        // format!(
+        //     "{}{} {}{}",
+        //     prefix,
+        //     prev_vowel,
+        //     if ["あ", "い", "う", "え", "お"].contains(&kana) {
+        //         kana
+        //     } else {
+        //         "絶対に入らないであろう音"
+        //     },
+        //     suffix
+        // ),
         // 単独音
         format!("{}- {}{}", prefix, kana, suffix),
         // 単独音2
@@ -110,7 +119,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         moras.push(pause_mora);
     }
 
-    for mora in moras.iter() {
+    for (i, mora) in moras.iter().enumerate() {
         let freq = if mora.pitch == 0.0 {
             // 無声化は前の音高を引き継ぐ
             prev_freq
@@ -129,7 +138,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             get_oto(&source.ongen.oto, &kana, prefix, suffix, &prev_vowel).await;
 
         let start = sum_length;
-        sum_length += length - 0.035;
+        sum_length += length;
         let Some((oto, oto_data)) = oto else {
             if kana == "R" {
                 info!("This ongen does not have R");
@@ -147,31 +156,24 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             continue;
         };
 
-        // let next_oto = if i < moras.len() - 1 {
-        //     let next_mora = &moras[i + 1];
-        //     get_oto(
-        //         &source.ongen.oto,
-        //         &text_to_oto(&next_mora.text),
-        //         prefix,
-        //         suffix,
-        //         &mora.vowel.to_lowercase(),
-        //     )
-        //     .await
-        // } else {
-        //     None
-        // };
+        let next_oto = if i < moras.len() - 1 {
+            let next_mora = &moras[i + 1];
+            get_oto(
+                &source.ongen.oto,
+                &text_to_oto(&next_mora.text),
+                prefix,
+                suffix,
+                &mora.vowel.to_lowercase(),
+            )
+            .await
+        } else {
+            None
+        };
         let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
         let skip = 0.0;
         aliases.push(oto.alias.clone());
 
-        let adjusted_length = length * 1000.0;
-        // - if let Some((next_oto, _)) = next_oto {
-        //     [next_oto.preutter, length * 1000.0 / 2.0]
-        //         .iter()
-        //         .fold(f64::MAX, |m, v| v.min(m))
-        // } else {
-        //     0.0
-        // };
+        let adjusted_length = length * 1000.0 + oto.overlap + 35.0;
 
         let request = SynthRequest {
             sample_fs: oto_data.header.sample_rate as i32,
@@ -189,10 +191,10 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             pitch_bend: vec![0],
             flag_g: 0,
             flag_o: 0,
-            flag_p: 0,
+            flag_p: 86,
             flag_mt: 0,
             flag_mb: 0,
-            flag_mv: 0,
+            flag_mv: 100,
         };
 
         synthesizer.add_request(&request, start, skip, adjusted_length, 5.0, 35.0);
@@ -246,7 +248,7 @@ pub async fn post_synthesis(
 
     let mut prev_freq = 0.0;
 
-    let cvvc_connect = 0.1;
+    let vcv_connect = 0.1;
 
     for accent_phrase in audio_query.accent_phrases {
         let phrase_source = PhraseSource {
@@ -255,7 +257,7 @@ pub async fn post_synthesis(
             ongen,
             speaker: query.speaker,
             volume_scale: audio_query.volume_scale,
-            cvvc_connect,
+            vcv_connect,
         };
         let hash = phrase_source.hash();
         let cache_hit = {
