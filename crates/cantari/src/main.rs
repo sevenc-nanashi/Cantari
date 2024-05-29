@@ -15,6 +15,8 @@ use axum::{
 };
 use clap::Parser;
 use ongen::ONGEN;
+use routes::audio_query::get_or_initialize_synthesizer;
+use routes::user_dict::get_or_initialize_user_dict;
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace};
 use tracing::{info, Level};
@@ -118,6 +120,9 @@ async fn main_impl(args: Cli) -> Result<()> {
     }
     tokio::fs::create_dir_all(TEMPDIR.as_path()).await?;
     info!("Created tempdir: {}", TEMPDIR.as_path().display());
+
+    get_or_initialize_synthesizer().await;
+    get_or_initialize_user_dict().await;
 
     info!("Starting server...");
 

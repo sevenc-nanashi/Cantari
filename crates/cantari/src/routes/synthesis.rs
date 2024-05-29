@@ -14,7 +14,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
-use tracing::{info, info_span, warn};
+use tracing::{error, info, info_span, warn};
 use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
@@ -38,7 +38,6 @@ struct PhraseSource<'a> {
     ongen: &'a crate::ongen::Ongen,
     speaker: u32,
     volume_scale: f32,
-    vcv_connect: f64,
 }
 
 impl PhraseSource<'_> {
@@ -52,8 +51,6 @@ impl PhraseSource<'_> {
 struct SynthesisResult {
     wav: Vec<f32>,
     sum_length: f64,
-    last_freq: f32,
-    last_vowel: String,
 }
 
 #[async_recursion]
@@ -116,8 +113,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
     }
 
     for (i, mora) in moras.iter().enumerate() {
-        let span = info_span!("mora", text = mora.text.clone());
-        let _guard = span.enter();
         let freq = if mora.pitch == 0.0 {
             // 無声化は前の音高を引き継ぐ
             prev_freq
@@ -140,7 +135,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let Some((oto, oto_data)) = oto else {
             if kana == "R" {
                 info!("This ongen does not have R");
-                sum_length -= length;
             } else if kana == "っ" {
                 info!("No oto found for っ");
 
@@ -229,15 +223,10 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             &vec![0.5f64; smooth_f0.len()],
             &vec![0.5f64; smooth_f0.len()],
         );
-        synthesizer.synth()
+        synthesizer.synth_async().await
     };
 
-    SynthesisResult {
-        wav,
-        sum_length,
-        last_freq: prev_freq,
-        last_vowel: prev_vowel,
-    }
+    SynthesisResult { wav, sum_length }
 }
 
 pub async fn post_synthesis(
@@ -255,56 +244,60 @@ pub async fn post_synthesis(
         .find(|ongen| ongen.id() == query.speaker)
         .unwrap();
 
-    let mut phrase_waves: Vec<PhraseWaves> = Vec::new();
-    let mut total_sum_length = 0.0f64;
+    let results = futures::future::join_all(audio_query.accent_phrases.iter().enumerate().map(
+        |(i, accent_phrase)| {
+            let accent_phrases = audio_query.accent_phrases.clone();
 
-    let mut prev_freq = 0.0;
+            async move {
+                let prev_freq = if i == 0 {
+                    440.0f32.ln()
+                } else {
+                    accent_phrases[i - 1].moras.last().unwrap().pitch.exp()
+                };
+                let phrase_source = PhraseSource {
+                    prev_freq,
+                    accent_phrase,
+                    ongen,
+                    speaker: query.speaker,
+                    volume_scale: audio_query.volume_scale,
+                };
+                let hash = phrase_source.hash();
+                let cache_hit = {
+                    let caches = CACHES.read().await;
+                    caches.contains(&hash)
+                };
+                let cache_path = TEMPDIR.join(format!("cache-{}.msgpack", hash));
+                let result = if cache_hit {
+                    info!("Cache hit for {}", hash);
+                    let data = fs_err::tokio::read(cache_path).await.unwrap();
+                    rmp_serde::from_read(data.as_slice()).unwrap()
+                } else {
+                    info!("Cache miss for {}", hash);
+                    let result = synthesis_phrase(&phrase_source).await;
+                    if let Err(e) =
+                        fs_err::tokio::write(cache_path, rmp_serde::to_vec(&result).unwrap()).await
+                    {
+                        error!("Failed to write cache: {}", e);
+                    };
+                    let mut caches = CACHES.write().await;
+                    caches.insert(hash);
+                    result
+                };
 
-    let vcv_connect = 0.1;
-
-    for accent_phrase in audio_query.accent_phrases {
-        let phrase_source = PhraseSource {
-            prev_freq,
-            accent_phrase: &accent_phrase,
-            ongen,
-            speaker: query.speaker,
-            volume_scale: audio_query.volume_scale,
-            vcv_connect,
-        };
-        let hash = phrase_source.hash();
-        let cache_hit = {
-            let caches = CACHES.read().await;
-            caches.contains(&hash)
-        };
-        let cache_path = TEMPDIR.join(format!("cache-{}.msgpack", hash));
-        let result = if cache_hit {
-            info!("Cache hit for {}", hash);
-            let data = fs_err::tokio::read(cache_path).await.unwrap();
-            rmp_serde::from_read(data.as_slice()).unwrap()
-        } else {
-            info!("Cache miss for {}", hash);
-            let result = synthesis_phrase(&phrase_source).await;
-            fs_err::tokio::write(cache_path, rmp_serde::to_vec(&result).unwrap())
-                .await
-                .map_err(|e| Error::SynthesisFailed(anyhow!("Failed to write cache: {}", e)))?;
-            let mut caches = CACHES.write().await;
-            caches.insert(hash);
-            result
-        };
-
-        let phrase_wave = PhraseWaves {
+                result
+            }
+        },
+    ))
+    .await;
+    let mut total_sum_length = 0.0;
+    let mut phrase_waves: Vec<PhraseWaves> = vec![];
+    for result in results {
+        phrase_waves.push(PhraseWaves {
             data: result.wav,
             start_seconds: total_sum_length,
-        };
-        phrase_waves.push(phrase_wave);
-
-        prev_freq = result.last_freq;
+        });
 
         total_sum_length += result.sum_length;
-        if let Some(pause_mora) = accent_phrase.pause_mora {
-            let pause_length = pause_mora.vowel_length;
-            total_sum_length += pause_length as f64;
-        }
     }
     let duration = total_sum_length
         + ((audio_query.pre_phoneme_length + audio_query.post_phoneme_length)

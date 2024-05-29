@@ -2,11 +2,14 @@ use super::sys;
 use tracing::info;
 
 pub struct PhraseSynth {
-    inner: *mut sys::PhraseSynth,
+    inner: Inner,
 }
 
-unsafe impl Send for PhraseSynth {}
-unsafe impl Sync for PhraseSynth {}
+#[derive(Clone)]
+struct Inner(*mut sys::PhraseSynth);
+
+unsafe impl Send for Inner {}
+unsafe impl Sync for Inner {}
 
 impl Default for PhraseSynth {
     fn default() -> Self {
@@ -17,7 +20,7 @@ impl Default for PhraseSynth {
 impl PhraseSynth {
     pub fn new() -> Self {
         Self {
-            inner: unsafe { sys::PhraseSynthNew() },
+            inner: Inner(unsafe { sys::PhraseSynthNew() }),
         }
     }
 
@@ -33,7 +36,7 @@ impl PhraseSynth {
         let c_request = request.into_sys();
         unsafe {
             sys::PhraseSynthAddRequest(
-                self.inner,
+                self.inner.0,
                 &c_request,
                 pos_ms,
                 skip_ms,
@@ -55,7 +58,7 @@ impl PhraseSynth {
     ) {
         unsafe {
             sys::PhraseSynthSetCurves(
-                self.inner,
+                self.inner.0,
                 f0.as_ptr(),
                 gender.as_ptr(),
                 tension.as_ptr(),
@@ -70,17 +73,32 @@ impl PhraseSynth {
     pub fn synth(&mut self) -> Vec<f32> {
         let mut y = std::ptr::null_mut();
         unsafe {
-            let len = sys::PhraseSynthSynth(self.inner, &mut y, log_callback) as usize;
+            let len = sys::PhraseSynthSynth(self.inner.0, &mut y, log_callback) as usize;
             let y = std::slice::from_raw_parts(y, len);
             y.to_vec()
         }
+    }
+
+    pub async fn synth_async(&mut self) -> Vec<f32> {
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut y = std::ptr::null_mut();
+            let inner = inner;
+            unsafe {
+                let len = sys::PhraseSynthSynth(inner.0, &mut y, log_callback) as usize;
+                let y = std::slice::from_raw_parts(y, len);
+                y.to_vec()
+            }
+        })
+        .await
+        .unwrap()
     }
 }
 
 impl Drop for PhraseSynth {
     fn drop(&mut self) {
         unsafe {
-            sys::PhraseSynthDelete(self.inner);
+            sys::PhraseSynthDelete(self.inner.0);
         }
     }
 }

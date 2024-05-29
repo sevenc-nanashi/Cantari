@@ -12,16 +12,24 @@ use tracing::{info, warn};
 use crate::error::{Error, Result};
 
 pub static USER_DICT: OnceCell<Arc<Mutex<UserDict>>> = OnceCell::const_new();
-async fn get_or_initialize_user_dict() -> Arc<Mutex<UserDict>> {
+pub async fn get_or_initialize_user_dict() -> Arc<Mutex<UserDict>> {
     if let Some(user_dict) = USER_DICT.get() {
         return user_dict.clone();
     }
+    info!("Initializing user dict...");
     let user_dict = UserDict::new();
 
-    if std::fs::metadata(&*USER_DICT_PATH).is_ok() {
+    if tokio::fs::metadata(&*USER_DICT_PATH).await.is_ok() {
+        info!("Loading user dict from {:?}", &*USER_DICT_PATH);
         user_dict.load(&USER_DICT_PATH).await.unwrap();
+    } else {
+        info!("User dict not found at {:?}", &*USER_DICT_PATH);
     }
 
+    let open_jtalk = get_or_initialize_open_jtalk().await;
+    open_jtalk.use_user_dict(&user_dict).await.unwrap();
+
+    info!("User dict initialized");
     Arc::new(Mutex::new(user_dict))
 }
 

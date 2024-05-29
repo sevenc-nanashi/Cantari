@@ -9,6 +9,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 anyhow = "1.0.86"
+tokio = "1.37.0"
 tracing = "0.1.40"
 
 [build-dependencies]
