@@ -208,7 +208,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         };
 
         synthesizer.add_request(&request, start, skip, adjusted_length, 5.0, 35.0);
-        info!("{} {}..{}", mora.text, start, start + adjusted_length);
 
         f0.extend(vec![freq; (length * 1000.0 / MS_PER_FRAME) as usize]);
 

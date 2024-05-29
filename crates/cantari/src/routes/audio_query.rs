@@ -14,6 +14,7 @@ use voicevox_core::{tokio::OpenJtalk, InitializeOptions};
 static SPEED_SCALE: f32 = 1.0;
 static INTONATION_SCALE: f32 = 1.5;
 
+pub static OPEN_JTALK: OnceCell<OpenJtalk> = OnceCell::const_new();
 pub static SYNTHESIZER: OnceCell<Arc<voicevox_core::tokio::Synthesizer<OpenJtalk>>> =
     OnceCell::const_new();
 
@@ -190,13 +191,34 @@ pub async fn get_or_initialize_synthesizer() -> Arc<voicevox_core::tokio::Synthe
     SYNTHESIZER.get().unwrap().clone()
 }
 
+pub async fn get_or_initialize_open_jtalk() -> OpenJtalk {
+    if let Some(open_jtalk) = OPEN_JTALK.get() {
+        return open_jtalk.clone();
+    }
+    initialize_open_jtalk().await;
+    OPEN_JTALK.get().unwrap().clone()
+}
+
+pub async fn initialize_open_jtalk() {
+    info!("Initializing OpenJtalk...");
+
+    let open_jtalk = OpenJtalk::new(camino::Utf8PathBuf::from_path_buf(open_jtalk_dic()).unwrap())
+        .await
+        .expect("Failed to initialize OpenJtalk");
+
+    if let Err(e) = OPEN_JTALK.set(open_jtalk) {
+        panic!("Failed to set OPEN_JTALK: {}", e);
+    }
+    info!("OpenJtalk initialized");
+}
+
 pub async fn initialize_synthesizer() {
     info!("Initializing Synthesizer...");
 
+    let open_jtalk = get_or_initialize_open_jtalk().await;
+
     let synthesizer = voicevox_core::tokio::Synthesizer::new(
-        OpenJtalk::new(camino::Utf8PathBuf::from_path_buf(open_jtalk_dic()).unwrap())
-            .await
-            .expect("Failed to initialize OpenJtalk"),
+        open_jtalk,
         &InitializeOptions {
             acceleration_mode: voicevox_core::AccelerationMode::Cpu,
             cpu_num_threads: 1,

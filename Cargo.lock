@@ -563,6 +563,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tower-http",
