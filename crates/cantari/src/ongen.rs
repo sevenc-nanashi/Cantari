@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::io::Cursor;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::{info, instrument, warn};
+use tracing::{info, info_span, instrument, warn};
 use uuid::Uuid;
 
 use crate::oto::Oto;
@@ -57,13 +57,16 @@ impl Ongen {
             if entry.file_name() != "oto.ini" {
                 continue;
             }
-            info!("Found oto.ini at {}", entry.path().display());
+            let span = info_span!("oto.ini", path = %entry.path().display());
+            let _guard = span.enter();
+
+            info!("Found oto.ini");
             let oto_ini_file = tokio::fs::read(entry.path()).await?;
             let oto_ini = encoding_rs::SHIFT_JIS.decode(&oto_ini_file).0;
             let oto =
                 Oto::from_oto_ini(&oto_ini, entry.path().parent().unwrap().to_path_buf()).await;
             if oto.is_empty() {
-                warn!("No oto found in oto.ini at {}", entry.path().display());
+                warn!("No oto found");
                 continue;
             }
             info!("Loaded {} oto entries", oto.len());

@@ -79,6 +79,15 @@ impl std::fmt::Display for MidiNote {
     }
 }
 
+pub fn smooth(base: &[f32], window_size: usize) -> Vec<f32> {
+    let mut smoothed = base.to_vec();
+    for i in window_size..base.len() - window_size {
+        let sum: f32 = base[i - window_size..i + window_size].iter().sum();
+        smoothed[i] = sum / (2 * window_size + 1) as f32;
+    }
+    smoothed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -36,7 +36,7 @@ type LogCallback = extern "C" fn(message: *const c_char);
 
 #[link(name = "worldline")]
 #[allow(dead_code)]
-extern "C" {
+extern "C-unwind" {
     pub fn F0(
         samples: *mut c_float,
         length: c_int,

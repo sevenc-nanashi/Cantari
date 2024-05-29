@@ -1,20 +1,20 @@
 use super::audio_query::HttpAudioQuery;
 use crate::{
     error::{Error, Result},
-    math::MidiNote,
+    math::{smooth, MidiNote},
     model::{AccentPhraseModel, AudioQueryModel},
     ongen::ONGEN,
     oto::{Oto, OtoData},
     tempdir::TEMPDIR,
 };
 use anyhow::anyhow;
+use async_recursion::async_recursion;
+use axum::{extract::Query, Json};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
-
-use axum::{extract::Query, Json};
-use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::{info, warn, info_span};
 use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
@@ -56,43 +56,22 @@ struct SynthesisResult {
     last_vowel: String,
 }
 
+#[async_recursion]
 async fn get_oto<'a>(
     oto: &'a HashMap<String, Oto>,
     kana: &str,
     prefix: &str,
     suffix: &str,
-    _prev_vowel: &str,
+    prev_vowel: &str,
 ) -> Option<(&'a Oto, OtoData)> {
-    // // 連続音（音質が安定しないので無効化）
-    // format!(
-    //     "{}{} {}{}",
-    //     prefix,
-    //     prev_vowel,
-    //     if ["あ", "い", "う", "え", "お"].contains(&kana) {
-    //         kana
-    //     } else {
-    //         "絶対に入らないであろう音"
-    //     },
-    //     suffix
-    // ),
-    let aliases = if kana == "お" {
-        vec![
-            // たまに「を」だけある音源があるので、それの対応。
-            // 単独音
-            format!("{}お{}", prefix, suffix),
-            format!("{}を{}", prefix, suffix),
-            // 単独音2
-            format!("{}- お{}", prefix, suffix),
-            format!("{}- を{}", prefix, suffix),
-        ]
-    } else {
-        vec![
-            // 単独音2
-            format!("{}{}{}", prefix, kana, suffix),
-            // 単独音
-            format!("{}- {}{}", prefix, kana, suffix),
-        ]
-    };
+    let aliases = [
+        // // 連続音（音質が安定しないので無効化）
+        // format!("{}{} {}{}", prefix, prev_vowel, kana, suffix),
+        // 単独音2
+        format!("{}{}{}", prefix, kana, suffix),
+        // 単独音
+        format!("{}- {}{}", prefix, kana, suffix),
+    ];
 
     for alias in aliases.iter() {
         if let Some(oto) = oto.get(alias) {
@@ -101,6 +80,11 @@ async fn get_oto<'a>(
                 Err(e) => warn!("Failed to read oto data for {:?}: {:?}", oto.alias, e),
             }
         }
+    }
+
+    // 「お」を「を」と登録してる場合があるので、それを考慮
+    if kana == "お" {
+        return get_oto(oto, "を", prefix, suffix, prev_vowel).await;
     }
 
     None
@@ -132,6 +116,8 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
     }
 
     for (i, mora) in moras.iter().enumerate() {
+        let span = info_span!("mora", text = mora.text.clone());
+        let _guard = span.enter();
         let freq = if mora.pitch == 0.0 {
             // 無声化は前の音高を引き継ぐ
             prev_freq
@@ -149,7 +135,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let oto: Option<(&Oto, OtoData)> =
             get_oto(&source.ongen.oto, &kana, prefix, suffix, &prev_vowel).await;
 
-        let mut start = sum_length;
+        let start = sum_length;
         sum_length += length;
         let Some((oto, oto_data)) = oto else {
             if kana == "R" {
@@ -168,32 +154,39 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             continue;
         };
 
-        let next_oto = if i < moras.len() - 1 {
+        let (next_oto, next_mora) = if i < moras.len() - 1 {
             let next_mora = &moras[i + 1];
-            get_oto(
-                &source.ongen.oto,
-                &text_to_oto(&next_mora.text),
-                prefix,
-                suffix,
-                &mora.vowel.to_lowercase(),
+            (
+                get_oto(
+                    &source.ongen.oto,
+                    &text_to_oto(&next_mora.text),
+                    prefix,
+                    suffix,
+                    &mora.vowel.to_lowercase(),
+                )
+                .await,
+                Some(next_mora),
             )
-            .await
         } else {
-            None
+            (None, None)
         };
-        let start = if start < 0.0 { 0.0 } else { start * 1000.0 } - oto.overlap;
-        let skip = 0.0;
+        let start = start - (oto.overlap) / 1000.0;
+        let skip = if start < 0.0 { -start } else { 0.0 };
+        let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
+        dbg!(start, skip);
         aliases.push(oto.alias.clone());
 
-        let adjusted_length = length * 1000.0 +  35.0;
+        let adjusted_length = length * 1000.0 + 35.0;
 
         let con_vel = if let Some(consonant_length) = mora.consonant_length {
             let oto_consonant_length = (oto.consonant - oto.preutter) / 1000.0;
             let con_vel = oto_consonant_length / (consonant_length as f64);
-            100.0 * con_vel
+            100.0 * con_vel.clamp(0.75, 1.25)
         } else {
             100.0
         };
+
+        dbg!(con_vel);
 
         let request = SynthRequest {
             sample_fs: oto_data.header.sample_rate as i32,
@@ -231,12 +224,14 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
     } else {
         info!("Synthesizing {:?}", aliases);
 
+        let smooth_f0 = smooth(&f0, 10);
+
         synthesizer.set_curves(
-            &f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
-            &vec![0.5f64; f0.len()],
-            &vec![0.5f64; f0.len()],
-            &vec![0.5f64; f0.len()],
-            &vec![0.5f64; f0.len()],
+            &smooth_f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
+            &vec![0.5f64; smooth_f0.len()],
+            &vec![0.5f64; smooth_f0.len()],
+            &vec![0.5f64; smooth_f0.len()],
+            &vec![0.5f64; smooth_f0.len()],
         );
         synthesizer.synth()
     };
@@ -321,7 +316,9 @@ pub async fn post_synthesis(
     let mut wav = vec![0.0; (duration * worldline::SAMPLE_RATE as f64) as usize];
 
     for phrase_wave in phrase_waves {
-        let start = (phrase_wave.start_seconds * worldline::SAMPLE_RATE as f64) as usize;
+        let start = ((phrase_wave.start_seconds
+            + (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64)
+            * worldline::SAMPLE_RATE as f64) as usize;
         let end = start + phrase_wave.data.len();
         if end > wav.len() {
             warn!(

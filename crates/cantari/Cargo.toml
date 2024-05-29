@@ -38,6 +38,7 @@ fs-err = { version = "2.11.0", features = ["tokio"] }
 xxhash-rust = { version = "0.8.10", features = ["xxh3"] }
 rmp-serde = "1.3.0"
 async-walkdir = "1.0.0"
+async-recursion = "1.1.1"
 
 [dev-dependencies]
 cargo-license = "0.5.1"

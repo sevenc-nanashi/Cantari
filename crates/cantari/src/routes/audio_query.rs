@@ -12,7 +12,7 @@ use tracing::info;
 use voicevox_core::{tokio::OpenJtalk, InitializeOptions};
 
 static SPEED_SCALE: f32 = 1.0;
-static INTONATION_SCALE: f32 = 2.0;
+static INTONATION_SCALE: f32 = 1.5;
 
 pub static SYNTHESIZER: OnceCell<Arc<voicevox_core::tokio::Synthesizer<OpenJtalk>>> =
     OnceCell::const_new();
