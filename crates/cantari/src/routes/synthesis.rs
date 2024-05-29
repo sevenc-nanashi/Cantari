@@ -14,7 +14,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
-use tracing::{info, warn, info_span};
+use tracing::{info, info_span, warn};
 use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
@@ -173,7 +173,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let start = start - (oto.overlap) / 1000.0;
         let skip = if start < 0.0 { -start } else { 0.0 };
         let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
-        dbg!(start, skip);
         aliases.push(oto.alias.clone());
 
         let adjusted_length = length * 1000.0 + 35.0;
@@ -185,8 +184,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         } else {
             100.0
         };
-
-        dbg!(con_vel);
 
         let request = SynthRequest {
             sample_fs: oto_data.header.sample_rate as i32,
