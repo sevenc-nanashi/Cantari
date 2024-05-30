@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - "v*"
-    paths:
-      - ".github/workflows/build.yml"
 
 defaults:
   run:
