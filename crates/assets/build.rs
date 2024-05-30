@@ -73,6 +73,7 @@ mod open_jtalk_dict {
     }
     pub fn move_dict() {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("../../../");
+        std::fs::create_dir_all(out_dir.join("dict")).unwrap();
         fs_extra::dir::copy(
             "assets/dict",
             out_dir.join("dict"),
