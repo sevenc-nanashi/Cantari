@@ -98,6 +98,10 @@ async fn main_impl(args: Cli) -> Result<()> {
             "/accent_phrases",
             post(routes::audio_query::post_accent_phrases),
         )
+        .route(
+            "/settings",
+            get(routes::settings::get_settings).put(routes::settings::put_settings),
+        )
         .layer(CorsLayer::permissive())
         .layer(
             trace::TraceLayer::new_for_http()

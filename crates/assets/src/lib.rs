@@ -21,3 +21,13 @@ pub fn tyc_utau() -> PathBuf {
 pub fn sample_vvm() -> PathBuf {
     asset("sample.vvm")
 }
+
+#[cfg(not(debug_assertions))]
+pub fn settings_html() -> PathBuf {
+    asset("settings.html")
+}
+
+#[cfg(debug_assertions)]
+pub fn settings_html() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("frontend/dist/index.html")
+}

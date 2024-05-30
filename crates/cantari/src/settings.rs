@@ -47,16 +47,16 @@ pub async fn load_settings() -> V1Settings {
         error!("Failed to load settings from {}: {}", path.display(), e);
         error!("Using default settings");
 
-        Settings::V1(V1Settings {
-            paths: vec![
-                "/mnt/e/utau/つくよみちゃんUTAU音源".to_string(),
-                "/mnt/e/utau/足立レイver3.1.2(単独音)".to_string(),
-                "/mnt/e/utau".to_string(),
-                "/mnt/e/OpenUtau/Singers".to_string(),
-                "/mnt/e/OpenUtau-dev/OpenUtau/bin/Debug/net6.0-windows/Singers".to_string(),
-                "/mnt/e/OpenUtau-dev/OpenUtau/bin/Release/net6.0-windows/Singers".to_string(),
-            ],
-        })
+        let paths = if cfg!(target_os = "windows") {
+            let appdata = PathBuf::from(std::env::var("APPDATA").unwrap());
+            let utau_voicebank = appdata.join("Utau").join("voice");
+
+            vec![utau_voicebank.to_string_lossy().to_string()]
+        } else {
+            vec![]
+        };
+
+        Settings::V1(V1Settings { paths })
     });
 
     // Migration will be added here
@@ -69,10 +69,10 @@ pub async fn load_settings() -> V1Settings {
     }
 }
 
-pub async fn write_settings(settings: Settings) {
+pub async fn write_settings(settings: V1Settings) {
     let path = get_path();
 
-    let settings = serde_json::to_string_pretty(&settings).unwrap();
+    let settings = serde_json::to_string_pretty(&Settings::V1(settings)).unwrap();
 
     tokio::fs::create_dir_all(path.parent().unwrap())
         .await

@@ -1,0 +1,32 @@
+@forward "element-plus/theme-chalk/src/common/var.scss" with (
+  $colors: (
+    "primary": (
+      "base": #55a8f2,
+    ),
+  )
+);
+
+body {
+  font-family: sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+  background-color: #f4f4f4;
+  margin: 0;
+  padding: 0;
+
+  @media (prefers-color-scheme: dark) {
+    background-color: #333;
+    color: #f4f4f4;
+  }
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 1rem;
+  margin: 0 auto;
+  max-width: 800px;
+  gap: 1rem;
+}

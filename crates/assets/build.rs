@@ -120,6 +120,23 @@ mod sample_vvm {
     }
 }
 
+mod frontend {
+    pub fn move_build() {
+        if std::fs::metadata("frontend/dist/index.html").is_err() {
+            if std::env::var("PROFILE").unwrap() == "release" {
+                panic!("frontend/dist/index.html not found");
+            } else {
+                eprintln!("frontend/dist/index.html not found");
+                return;
+            }
+        }
+        let out_dir = std::env::var("OUT_DIR").unwrap();
+        let out_dir = std::path::PathBuf::from(out_dir);
+        let out_dir = out_dir.join("../../../");
+        std::fs::copy("frontend/dist/index.html", out_dir.join("settings.html")).unwrap();
+    }
+}
+
 fn main() {
     open_jtalk_dict::download();
     tyc_utau::download();
@@ -130,5 +147,6 @@ fn main() {
     if std::env::var("PROFILE").unwrap() == "release" {
         open_jtalk_dict::move_dict();
         sample_vvm::move_vvm();
+        frontend::move_build();
     }
 }
