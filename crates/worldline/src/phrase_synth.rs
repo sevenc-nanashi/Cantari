@@ -1,5 +1,31 @@
 use super::sys;
+use dlopen2::wrapper::Container;
+use once_cell::sync::Lazy;
 use tracing::info;
+
+static LIB: Lazy<Container<sys::WorldlineSys>> = Lazy::new(|| {
+    let lib_name = if cfg!(target_os = "windows") {
+        "worldline.dll"
+    } else if cfg!(target_os = "macos") {
+        "libworldline.dylib"
+    } else {
+        "libworldline.so"
+    };
+    let exe_path = std::env::current_exe().unwrap();
+    let lib_paths = [
+        exe_path.parent().unwrap().join(lib_name),
+        exe_path.parent().unwrap().parent().unwrap().join(lib_name),
+    ];
+    let lib_path = lib_paths
+        .iter()
+        .find(|p| p.exists())
+        .expect("Failed to find libworldline.so");
+
+    unsafe {
+        let lib = Container::load(lib_path);
+        lib.unwrap()
+    }
+});
 
 pub struct PhraseSynth {
     inner: Inner,
@@ -20,7 +46,7 @@ impl Default for PhraseSynth {
 impl PhraseSynth {
     pub fn new() -> Self {
         Self {
-            inner: Inner(unsafe { sys::PhraseSynthNew() }),
+            inner: Inner(unsafe { LIB.PhraseSynthNew() }),
         }
     }
 
@@ -35,7 +61,7 @@ impl PhraseSynth {
     ) {
         let c_request = request.into_sys();
         unsafe {
-            sys::PhraseSynthAddRequest(
+            LIB.PhraseSynthAddRequest(
                 self.inner.0,
                 &c_request,
                 pos_ms,
@@ -57,7 +83,7 @@ impl PhraseSynth {
         voicing: &[f64],
     ) {
         unsafe {
-            sys::PhraseSynthSetCurves(
+            LIB.PhraseSynthSetCurves(
                 self.inner.0,
                 f0.as_ptr(),
                 gender.as_ptr(),
@@ -73,7 +99,7 @@ impl PhraseSynth {
     pub fn synth(&mut self) -> Vec<f32> {
         let mut y = std::ptr::null_mut();
         unsafe {
-            let len = sys::PhraseSynthSynth(self.inner.0, &mut y, log_callback) as usize;
+            let len = LIB.PhraseSynthSynth(self.inner.0, &mut y, log_callback) as usize;
             let y = std::slice::from_raw_parts(y, len);
             y.to_vec()
         }
@@ -85,7 +111,7 @@ impl PhraseSynth {
             let mut y = std::ptr::null_mut();
             let inner = inner;
             unsafe {
-                let len = sys::PhraseSynthSynth(inner.0, &mut y, log_callback) as usize;
+                let len = LIB.PhraseSynthSynth(inner.0, &mut y, log_callback) as usize;
                 let y = std::slice::from_raw_parts(y, len);
                 y.to_vec()
             }
@@ -98,7 +124,7 @@ impl PhraseSynth {
 impl Drop for PhraseSynth {
     fn drop(&mut self) {
         unsafe {
-            sys::PhraseSynthDelete(self.inner.0);
+            LIB.PhraseSynthDelete(self.inner.0);
         }
     }
 }

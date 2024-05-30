@@ -1,3 +1,5 @@
+#![allow(non_snake_case, clippy::too_many_arguments)]
+use dlopen2::wrapper::WrapperApi;
 use std::ffi::{c_char, c_double, c_float, c_int};
 
 #[repr(C)]
@@ -34,35 +36,35 @@ pub struct SynthRequest {
 
 type LogCallback = extern "C" fn(message: *const c_char);
 
-#[allow(dead_code)]
-extern "C-unwind" {
-    pub fn F0(
+#[derive(WrapperApi)]
+pub struct WorldlineSys {
+    F0: unsafe extern "C" fn(
         samples: *mut c_float,
         length: c_int,
         fs: c_int,
         frame_period: c_double,
         method: c_int,
         f0: *mut *mut c_double,
-    ) -> c_int;
+    ) -> c_int,
 
-    pub fn DecodeMgc(
+    DecodeMgc: unsafe extern "C" fn(
         f0_length: c_int,
         mgc: *mut c_double,
         mgc_size: c_int,
         fft_size: c_int,
         fs: c_int,
         spectrogram: *mut *mut c_double,
-    ) -> c_int;
+    ) -> c_int,
 
-    pub fn DecodeBap(
+    DecodeBap: unsafe extern "C" fn(
         f0_length: c_int,
         bap: *mut c_double,
         fft_size: c_int,
         fs: c_int,
         aperiodicity: *mut *mut c_double,
-    ) -> c_int;
+    ) -> c_int,
 
-    pub fn WorldSynthesis(
+    WorldSynthesis: unsafe extern "C" fn(
         f0: *const c_double,
         f0_length: c_int,
         mgc_or_sp: *const c_double,
@@ -78,15 +80,15 @@ extern "C-unwind" {
         tension: *const c_double,
         breathiness: *const c_double,
         voicing: *const c_double,
-    ) -> c_int;
+    ) -> c_int,
 
-    pub fn Resample(request: *const SynthRequest, y: *mut *mut c_float) -> c_int;
+    Resample: unsafe extern "C" fn(request: *const SynthRequest, y: *mut *mut c_float) -> c_int,
 
-    pub fn PhraseSynthNew() -> *mut PhraseSynth;
+    PhraseSynthNew: unsafe extern "C" fn() -> *mut PhraseSynth,
 
-    pub fn PhraseSynthDelete(phrase_synth: *mut PhraseSynth);
+    PhraseSynthDelete: unsafe extern "C" fn(phrase_synth: *mut PhraseSynth),
 
-    pub fn PhraseSynthAddRequest(
+    PhraseSynthAddRequest: unsafe extern "C" fn(
         phrase_synth: *mut PhraseSynth,
         request: *const SynthRequest,
         pos_ms: c_double,
@@ -95,9 +97,9 @@ extern "C-unwind" {
         fade_in_ms: c_double,
         fade_out_ms: c_double,
         logCallback: LogCallback,
-    );
+    ),
 
-    pub fn PhraseSynthSetCurves(
+    PhraseSynthSetCurves: unsafe extern "C" fn(
         phrase_synth: *mut PhraseSynth,
         f0: *const c_double,
         gender: *const c_double,
@@ -106,11 +108,11 @@ extern "C-unwind" {
         voicing: *const c_double,
         length: c_int,
         logCallback: LogCallback,
-    );
+    ),
 
-    pub fn PhraseSynthSynth(
+    PhraseSynthSynth: unsafe extern "C" fn(
         phrase_synth: *mut PhraseSynth,
         y: *mut *mut c_float,
         logCallback: LogCallback,
-    ) -> c_int;
+    ) -> c_int,
 }

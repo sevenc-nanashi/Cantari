@@ -13,17 +13,16 @@ fn main() {
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
     );
     eprintln!("Building cpp code in {}", cpp_path);
-    if duct::cmd!("bazelisk", "build", "//worldline")
+    if let Err(e) = duct::cmd!("bazelisk", "build", "//worldline")
         .dir(cpp_path)
         .run()
-        .is_err()
     {
         if std::env::var("PROFILE").unwrap() == "release" {
-            panic!("Failed to build cpp code");
+            panic!("Failed to build cpp code: {:?}", e);
         }
         // rust-analyzerだとなぜかエラーが出るので握りつぶす。
         // TODO: ちゃんと直す
-        eprintln!("Failed to build cpp code");
+        eprintln!("Failed to build cpp code: {:?}", e);
         std::process::exit(0);
     }
 
@@ -43,7 +42,4 @@ fn main() {
     // TODO: もっといい方法があれば変える
     let binary = std::fs::read(&out_lib_path).unwrap();
     std::fs::write(&target_lib_path, binary).unwrap();
-
-    println!("cargo:rustc-link-search=native={}", out_dir);
-    println!("cargo:rustc-link-lib=dylib=worldline");
 }
