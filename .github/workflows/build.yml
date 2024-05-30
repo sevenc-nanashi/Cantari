@@ -73,6 +73,7 @@ jobs:
           pnpm install
           pnpm build
 
+      - uses: sevenc-nanashi/dotfiles@main
       - name: Build rust
         run: |
           echo "Building version ${{ steps.version.outputs.version }}"
