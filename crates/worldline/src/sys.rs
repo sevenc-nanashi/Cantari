@@ -34,7 +34,6 @@ pub struct SynthRequest {
 
 type LogCallback = extern "C" fn(message: *const c_char);
 
-#[link(name = "worldline")]
 #[allow(dead_code)]
 extern "C-unwind" {
     pub fn F0(
