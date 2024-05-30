@@ -36,8 +36,14 @@ jobs:
           else
             VERSION=${{ inputs.version }}
           fi
+          if [[ $VERSION == *"-"* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "prerelease=${PRERELEASE}" >> $GITHUB_OUTPUT
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Setup Rust
@@ -80,5 +86,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
             cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip
