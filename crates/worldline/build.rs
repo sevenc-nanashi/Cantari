@@ -18,6 +18,9 @@ fn main() {
         .run()
         .is_err()
     {
+        if std::env::var("PROFILE").unwrap() == "release" {
+            panic!("Failed to build cpp code");
+        }
         // rust-analyzerだとなぜかエラーが出るので握りつぶす。
         // TODO: ちゃんと直す
         eprintln!("Failed to build cpp code");
