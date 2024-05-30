@@ -28,6 +28,12 @@ jobs:
             suffix: -macos
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Setup zip
+        if: matrix.os == 'windows-latest'
+        run: |
+          curl.exe https://www.willus.com/archive/zip64/infozip_binaries_win64.zip -o zip64.zip
+          7z x zip64.zip -oC:\tools
+          echo "C:/tools/zip64" >> $GITHUB_PATH
       - name: Determine version
         id: version
         run: |
@@ -84,7 +90,7 @@ jobs:
         run: |
           mkdir archive
           cp -r target/release/{cantari,sample.vvm,*.html,dict} archive
-          cp crates/cantari/{*.dylib,*.so,*.dll} archive || true
+          cp target/release/{*.dylib,*.so,*.dll} archive || true
           cp crates/cantari/engine_manifest.json archive
           cd archive
           zip -r ../cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip .
