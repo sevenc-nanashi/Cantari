@@ -1,3 +1,5 @@
+use std::os::unix::process::CommandExt;
+
 static LIB_NAME: &str = if cfg!(target_os = "windows") {
     "worldline.dll"
 } else if cfg!(target_os = "macos") {
@@ -13,16 +15,29 @@ fn main() {
         std::env::var("CARGO_MANIFEST_DIR").unwrap(),
     );
     eprintln!("Building cpp code in {}", cpp_path);
-    if let Err(e) = duct::cmd!("bazelisk", "build", "//worldline")
-        .dir(cpp_path)
-        .run()
-    {
+    let output = if std::env::var("TARGET").unwrap().contains("windows") {
+        std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("bazelisk build //worldline")
+            .current_dir(cpp_path)
+            .output()
+            .unwrap()
+    } else {
+        std::process::Command::new("bazelisk")
+            .arg("build")
+            .arg("//worldline")
+            .current_dir(cpp_path)
+            .output()
+            .unwrap()
+    };
+
+    if !output.status.success() {
         if std::env::var("PROFILE").unwrap() == "release" {
-            panic!("Failed to build cpp code: {:?}", e);
+            panic!("Failed to build cpp code: {:?}", output);
         }
         // rust-analyzerだとなぜかエラーが出るので握りつぶす。
         // TODO: ちゃんと直す
-        eprintln!("Failed to build cpp code: {:?}", e);
+        eprintln!("Failed to build cpp code: {:?}", output);
         std::process::exit(0);
     }
 
