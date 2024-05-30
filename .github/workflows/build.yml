@@ -1,0 +1,72 @@
+name: Build and release binary
+on:
+  push:
+    tags:
+      - "v*"
+    paths:
+      - ".github/workflows/build.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            suffix: -linux
+          - os: windows-latest
+            suffix: -windows
+          - os: macos-latest
+            suffix: -macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Build frontend
+        run: |
+          cd crates/assets/frontend
+          pnpm build
+      - name: Build
+        run: |
+          VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          if [ "$VERSION" == "$GITHUB_REF" ]; then
+            echo Not triggered by a tag, using the latest version
+            VERSION=0.0.0-dev
+          fi
+          echo "Building version $VERSION"
+          cargo install cargo-edit
+          cargo set-version $VERSION -p cantari
+          cargo build --release
+      - name: Archive
+        run: |
+          mkdir archive
+          cp target/release/{cantari,*.so,*.dll,*.dylib,sample.vvm,*.html,dict} archive
+          zip -r cantari-${{ github.ref_name }}${{ matrix.suffix }}.zip archive
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            cantari-${{ github.ref_name }}${{ matrix.suffix }}.zip
