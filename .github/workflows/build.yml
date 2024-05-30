@@ -3,6 +3,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build'
+        required: true
+        default: 'v0.0.0'
 
 defaults:
   run:
@@ -48,10 +54,10 @@ jobs:
           pnpm build
       - name: Build
         run: |
-          VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
-          if [ "$VERSION" == "$GITHUB_REF" ]; then
-            echo Not triggered by a tag, using the latest version
-            VERSION=0.0.0-dev
+          if [ -z "${{ inputs.version }}" ]; then
+            VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          else
+            VERSION=${{ inputs.version }}
           fi
           echo "Building version $VERSION"
           cargo install cargo-edit
