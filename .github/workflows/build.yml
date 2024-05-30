@@ -28,6 +28,16 @@ jobs:
             suffix: -macos
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ -z "${{ inputs.version }}" ]; then
+            VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          else
+            VERSION=${{ inputs.version }}
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Setup Rust
@@ -54,20 +64,18 @@ jobs:
           pnpm build
       - name: Build rust
         run: |
-          if [ -z "${{ inputs.version }}" ]; then
-            VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
-          else
-            VERSION=${{ inputs.version }}
-          fi
-          echo "Building version $VERSION"
+          echo "Building version ${{ steps.version.outputs.version }}"
           cargo install cargo-edit
-          cargo set-version $VERSION -p cantari
+          cargo set-version ${{ steps.version.outputs.version }}
           cargo build --release
+
       - name: Archive
         run: |
           mkdir archive
           cp target/release/{cantari,*.so,*.dll,*.dylib,sample.vvm,*.html,dict} archive
-          zip -r cantari-${{ github.ref_name }}${{ matrix.suffix }}.zip archive
+          cp crates/cantari/engine_manifest.json archive
+          cd archive
+          zip -r ../cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip .
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
