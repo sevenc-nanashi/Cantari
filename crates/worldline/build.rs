@@ -1,5 +1,3 @@
-use std::os::unix::process::CommandExt;
-
 static LIB_NAME: &str = if cfg!(target_os = "windows") {
     "worldline.dll"
 } else if cfg!(target_os = "macos") {
