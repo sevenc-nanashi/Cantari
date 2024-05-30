@@ -33,7 +33,7 @@ jobs:
         run: |
           curl.exe https://www.willus.com/archive/zip64/infozip_binaries_win64.zip -o zip64.zip
           7z x zip64.zip -oC:\tools
-          echo "C:/tools/zip64" >> $GITHUB_PATH
+          echo "C:/tools" >> $GITHUB_PATH
       - name: Determine version
         id: version
         run: |
