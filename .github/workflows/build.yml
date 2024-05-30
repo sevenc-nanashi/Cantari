@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build'
+        description: "Version to build"
         required: true
-        default: '0.0.0'
+        default: "0.0.0"
 
 defaults:
   run:
@@ -94,6 +94,8 @@ jobs:
           cp crates/cantari/engine_manifest.json archive
           cd archive
           zip -r ../cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip .
+          cd ..
+          mv cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.vvpp
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -101,4 +103,4 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           prerelease: ${{ steps.version.outputs.prerelease }}
           files: |
-            cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip
+            cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.vvpp
