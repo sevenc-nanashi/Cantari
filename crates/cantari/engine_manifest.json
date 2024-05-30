@@ -1,0 +1,7 @@
+{
+  "name": "AIVoice to Voicevox bridge",
+  "uuid": "a6b5fbf0-4561-43b3-83b5-1c0a4a1e32af",
+  "command": "aivoice-vox",
+  "port": 50201,
+  "supported_features": {}
+}

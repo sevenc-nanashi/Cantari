@@ -1,20 +1,19 @@
 use super::audio_query::HttpAudioQuery;
 use crate::{
-    error::{Error, Result},
+    error::Result,
     math::{smooth, MidiNote},
     model::{AccentPhraseModel, AudioQueryModel},
     ongen::ONGEN,
     oto::{Oto, OtoData},
     tempdir::TEMPDIR,
 };
-use anyhow::anyhow;
 use async_recursion::async_recursion;
 use axum::{extract::Query, Json};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
-use tracing::{error, info, info_span, warn};
+use tracing::{error, info, warn};
 use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
@@ -148,22 +147,22 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             continue;
         };
 
-        let (next_oto, next_mora) = if i < moras.len() - 1 {
-            let next_mora = &moras[i + 1];
-            (
-                get_oto(
-                    &source.ongen.oto,
-                    &text_to_oto(&next_mora.text),
-                    prefix,
-                    suffix,
-                    &mora.vowel.to_lowercase(),
-                )
-                .await,
-                Some(next_mora),
-            )
-        } else {
-            (None, None)
-        };
+        // let (next_oto, next_mora) = if i < moras.len() - 1 {
+        //     let next_mora = &moras[i + 1];
+        //     (
+        //         get_oto(
+        //             &source.ongen.oto,
+        //             &text_to_oto(&next_mora.text),
+        //             prefix,
+        //             suffix,
+        //             &mora.vowel.to_lowercase(),
+        //         )
+        //         .await,
+        //         Some(next_mora),
+        //     )
+        // } else {
+        //     (None, None)
+        // };
         let start = start - (oto.overlap) / 1000.0;
         let skip = if start < 0.0 { -start } else { 0.0 };
         let start = if start < 0.0 { 0.0 } else { start * 1000.0 };

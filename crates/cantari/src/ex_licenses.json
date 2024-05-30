@@ -1,8 +1,8 @@
 [
   {
-    "name": "voicevox_core",
-    "version": "53601b5",
+    "name": "worldline",
+    "version": "b969d528",
     "license": "MIT",
-    "text": "MIT Licenseでリリースされています。 https://github.com/VOICEVOX/voicevox_core/blob/main/LICENSE"
+    "text": "Copyright (c) 2014 StAkira\nReleased under the MIT license.\nhttps://github.com/stakira/OpenUtau/blob/master/LICENSE.txt"
   }
 ]

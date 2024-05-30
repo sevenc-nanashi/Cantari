@@ -75,7 +75,7 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
     licenses.remove(
         licenses
             .iter()
-            .position(|license| license.name == "aivoice-vox")
+            .position(|license| license.name == "cantari")
             .unwrap(),
     );
     let mut dependency_licenses = licenses
@@ -99,9 +99,9 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
     dependency_licenses.extend(external_licenses);
     Json(EngineManifest {
         manifest_version: "0.13.1".to_string(),
-        name: "UTAU to Voicevox bridge".to_string(),
+        name: "Cantari - Let UTAUs speak on Voicevox".to_string(),
         brand_name: "Cantari".to_string(),
-        uuid: "14f4bd0b-99ac-48cc-8171-d93439f16b33".to_string(),
+        uuid: "a6b5fbf0-4561-43b3-83b5-1c0a4a1e32af".to_string(),
         url: "https://github.com/sevenc-nanashi/cantari".to_string(),
         icon,
         default_sampling_rate: 48000,
