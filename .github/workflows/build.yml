@@ -81,4 +81,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            cantari-${{ github.ref_name }}${{ matrix.suffix }}.zip
+            cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip
