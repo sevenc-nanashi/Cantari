@@ -81,7 +81,7 @@ jobs:
       - name: Archive
         run: |
           mkdir archive
-          cp target/release/{cantari,*.so,*.dll,*.dylib,sample.vvm,*.html,dict} archive
+          cp -r target/release/{cantari,*.so,*.dll,*.dylib,sample.vvm,*.html,dict} archive
           cp crates/cantari/engine_manifest.json archive
           cd archive
           zip -r ../cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip .
