@@ -46,6 +46,8 @@ jobs:
           echo "prerelease=${PRERELEASE}" >> $GITHUB_OUTPUT
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
