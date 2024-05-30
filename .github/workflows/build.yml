@@ -39,21 +39,20 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 8
-      - name: Set up Node
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
           cache: "pnpm"
           cache-dependency-path: "crates/assets/frontend/pnpm-lock.yaml"
-      - name: Install dependencies
-        run: pnpm install
-      - name: Cache dependencies
+      - name: Cache rust dependencies
         uses: Swatinem/rust-cache@v2
       - name: Build frontend
         run: |
           cd crates/assets/frontend
+          pnpm install
           pnpm build
-      - name: Build
+      - name: Build rust
         run: |
           if [ -z "${{ inputs.version }}" ]; then
             VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
