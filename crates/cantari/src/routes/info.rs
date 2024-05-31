@@ -99,7 +99,7 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
     dependency_licenses.extend(external_licenses);
     Json(EngineManifest {
         manifest_version: "0.13.1".to_string(),
-        name: "Cantari - Let UTAUs speak on Voicevox".to_string(),
+        name: "Cantari".to_string(),
         brand_name: "Cantari".to_string(),
         uuid: "a6b5fbf0-4561-43b3-83b5-1c0a4a1e32af".to_string(),
         url: "https://github.com/sevenc-nanashi/cantari".to_string(),

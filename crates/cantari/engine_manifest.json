@@ -1,7 +1,7 @@
 {
-  "name": "AIVoice to Voicevox bridge",
+  "name": "Cantari",
   "uuid": "a6b5fbf0-4561-43b3-83b5-1c0a4a1e32af",
-  "command": "aivoice-vox",
-  "port": 50201,
+  "command": "cantari",
+  "port": 50202,
   "supported_features": {}
 }
