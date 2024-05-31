@@ -34,7 +34,7 @@ struct Cli {
     #[clap(short, long, default_value = "50202")]
     port: u16,
     /// ホスト名。
-    #[clap(short, long, default_value = "127.0.0.1")]
+    #[clap(long, default_value = "127.0.0.1")]
     host: String,
 }
 
@@ -133,7 +133,7 @@ async fn main_impl(args: Cli) -> Result<()> {
 
     info!("Starting server...");
 
-    info!("Listening on port {}", args.port);
+    info!("Listening on http://{}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -150,5 +150,5 @@ async fn main_impl(args: Cli) -> Result<()> {
 }
 
 async fn get_index() -> impl IntoResponse {
-    Redirect::permanent("https://github.com/sevenc-nanashi/cantari")
+    Redirect::permanent("/settings")
 }
