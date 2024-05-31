@@ -33,6 +33,9 @@ struct Cli {
     /// ポート番号。
     #[clap(short, long, default_value = "50202")]
     port: u16,
+    /// ホスト名。
+    #[clap(short, long, default_value = "127.0.0.1")]
+    host: String,
 }
 
 #[tokio::main]
@@ -109,7 +112,7 @@ async fn main_impl(args: Cli) -> Result<()> {
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
+    let addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;
 
     setup_ongen().await;
     {
