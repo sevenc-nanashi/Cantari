@@ -118,7 +118,7 @@ async fn main_impl(args: Cli) -> Result<()> {
     {
         let ongens = ONGEN.get().unwrap().read().await;
         for ongen in ongens.values() {
-            info!("- {} ({})", ongen.name(), ongen.uuid);
+            info!("- {} ({}, {})", ongen.name(), ongen.uuid, ongen.id());
         }
     }
 

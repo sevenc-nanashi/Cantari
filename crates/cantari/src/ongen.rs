@@ -112,7 +112,7 @@ impl Ongen {
     pub fn id(&self) -> u32 {
         let uuid_string = self.uuid.to_string();
         let uuid_first_section = uuid_string.split('-').next().unwrap();
-        u32::from_str_radix(uuid_first_section, 16).unwrap() & !(0xffu32)
+        (u32::from_str_radix(uuid_first_section, 16).unwrap() >> 1) & !(0xffu32)
     }
 
     pub async fn read_image(&self) -> Option<Vec<u8>> {
