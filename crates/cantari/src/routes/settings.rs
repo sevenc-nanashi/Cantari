@@ -5,15 +5,24 @@ use assets::settings_html;
 use axum::{response::Html, Json};
 use serde::{Deserialize, Serialize};
 
+static SETTINGS_START: &str = r#"<script id="settings" type="application/json">"#;
+static SETTINGS_END: &str = r#"</script>"#;
+
 pub async fn get_settings() -> Html<String> {
     let html = tokio::fs::read_to_string(settings_html()).await.unwrap();
 
     let settings = load_settings().await;
 
-    Html(html.replace(
-        r#"{"paths": ["/dummy/path"]}"#,
-        &serde_json::to_string(&settings).unwrap(),
-    ))
+    let settings_json = serde_json::to_string(&settings).unwrap();
+
+    let settings_start_index = html.find(SETTINGS_START).unwrap();
+    let settings_end_index = html.find(SETTINGS_END).unwrap();
+
+    let mut new_html = html[..settings_start_index + SETTINGS_START.len()].to_string();
+    new_html.push_str(&settings_json);
+    new_html.push_str(&html[settings_end_index..]);
+
+    Html(new_html)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
