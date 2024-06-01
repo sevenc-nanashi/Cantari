@@ -1,5 +1,6 @@
 use axum::{response::IntoResponse, Json};
 use base64::Engine as _;
+use regex_macro::regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -97,6 +98,53 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
     let external_licenses: Vec<DependencyLicense> =
         serde_json::from_slice(include_bytes!("../ex_licenses.json")).unwrap();
     dependency_licenses.extend(external_licenses);
+
+    let changelog = include_str!("../../../../CHANGELOG.md");
+    let versions = changelog
+        .lines()
+        .filter(|line| line.starts_with("## "))
+        .map(|line| line.trim_start_matches("## ").to_string())
+        .collect::<Vec<_>>();
+
+    let mut update_infos = vec![];
+    let description_pattern = regex!(
+        r"- (?P<description>.+) by \[(?P<contributor>.+)\]\(https://github.com/(?P<contributor_in_url>.+)\)"
+    );
+    for version in versions {
+        let lines = changelog
+            .lines()
+            .skip_while(|line| line != &format!("## {}", version))
+            .skip(1)
+            .take_while(|line| !line.starts_with("## "))
+            .map(|line| line.to_string())
+            .filter(|line| line.starts_with("- "))
+            .collect::<Vec<_>>();
+
+        assert!(!lines.is_empty());
+
+        let mut descriptions = vec![];
+        let mut contributors = vec![];
+
+        for line in lines {
+            let captures = description_pattern
+                .captures(&line)
+                .unwrap_or_else(|| panic!("assertion failed: {:?} does not match", line));
+            assert_eq!(
+                captures.name("contributor").unwrap().as_str(),
+                captures.name("contributor_in_url").unwrap().as_str()
+            );
+
+            descriptions.push(captures.name("description").unwrap().as_str().to_string());
+            contributors.push(captures.name("contributor").unwrap().as_str().to_string());
+        }
+
+        update_infos.push(UpdateInfo {
+            version,
+            descriptions,
+            contributors,
+        });
+    }
+
     Json(EngineManifest {
         manifest_version: "0.13.1".to_string(),
         name: "Cantari".to_string(),
@@ -106,11 +154,7 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
         icon,
         default_sampling_rate: 48000,
         terms_of_service: "音源の規約に従って下さい。".to_string(),
-        update_infos: vec![UpdateInfo {
-            version: "0.1.0".to_string(),
-            descriptions: vec!["初期リリース".to_string()],
-            contributors: vec!["sevenc-nanashi".to_string()],
-        }],
+        update_infos,
         dependency_licenses,
         supported_features: SupportedFeatures {
             adjust_mora_pitch: true,
@@ -132,4 +176,16 @@ pub async fn get_supported_devices() -> Json<SupportedDeveices> {
         cuda: false,
         dml: false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn test_get_manifest() {
+        let manifest = get_engine_manifest().await.into_response();
+        assert_eq!(manifest.status(), 200);
+    }
 }

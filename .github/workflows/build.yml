@@ -84,6 +84,7 @@ jobs:
           echo "Building version ${{ steps.version.outputs.version }}"
           cargo install cargo-edit
           cargo set-version ${{ steps.version.outputs.version }} -p cantari
+          cargo test --all
           cargo build --release -vv
 
       - name: Archive

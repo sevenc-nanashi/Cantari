@@ -23,3 +23,14 @@ MIT License で公開しています。詳しくは[LICENSE](LICENSE)をご覧�
 生成された音声については、音源の規約に従ってください。
 このブリッジ自体にはクレジット表記は必要ありませんが、このリポジトリのリンクを貼ったり[紹介動画](https://www.nicovideo.jp/watch/sm43856969)を親作品登録していただいたりすると嬉しいです。
 もしタグをつけるなら[`cantari使用`](https://nicovideo.jp/tag/cantari使用)でお願いします。（必須ではないです）
+
+<!-- 
+# 自分用メモ
+
+## リリース手順
+
+1. CHANGELOG.md を更新
+2. `git commit -am "Update: v0.0.0"`
+3. `git tag v0.0.0`
+4. `git push origin main --tags`
+-->
