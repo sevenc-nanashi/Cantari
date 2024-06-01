@@ -130,13 +130,13 @@ jobs:
               "使い方はここを参照してください：https://github.com/sevenc-nanashi/Cantari?tab=readme-ov-file#cantari--let-utaus-speak-on-voicevox\n\n" +
               "Mac OS版は不安定です。"
 
-            const { data: release } = await github.repos.getReleaseByTag({
+            const { data: release } = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag: `v${version}`,
             })
 
-            await github.repos.updateRelease({
+            await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: release.id,
