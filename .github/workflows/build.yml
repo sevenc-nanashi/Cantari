@@ -24,7 +24,7 @@ jobs:
             suffix: -linux
           - os: windows-latest
             suffix: -windows
-          - os: macos-latest
+          - os: macos-13 # Intel Macにする
             suffix: -macos
     runs-on: ${{ matrix.os }}
     steps:
