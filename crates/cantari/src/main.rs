@@ -7,6 +7,7 @@ mod routes;
 mod settings;
 mod tempdir;
 
+use crate::settings::{get_settings_path, load_settings, write_settings};
 use anyhow::Result;
 use axum::{
     response::{IntoResponse, Redirect},
@@ -112,6 +113,13 @@ async fn main_impl(args: Cli) -> Result<()> {
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
 
+    let settings_path = get_settings_path();
+    let has_settings = settings_path.exists();
+    if !has_settings {
+        info!("Settings file does not exist: {}", settings_path.display());
+        write_settings(load_settings().await).await;
+    }
+
     let addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;
 
     setup_ongen().await;
@@ -134,6 +142,11 @@ async fn main_impl(args: Cli) -> Result<()> {
     info!("Starting server...");
 
     info!("Listening on http://{}", addr);
+
+    if !has_settings {
+        info!("Launching browser...");
+        open::that(format!("http://{}", addr))?;
+    }
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
