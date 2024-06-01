@@ -30,7 +30,8 @@ MIT License で公開しています。詳しくは[LICENSE](LICENSE)をご覧�
 ## リリース手順
 
 1. CHANGELOG.md を更新
-2. `git commit -am "Update: v0.0.0"`
-3. `git tag v0.0.0`
-4. `git push origin main --tags`
+2. `cargo test`
+3. `git commit -am "Update: v0.0.0"`
+4. `git tag v0.0.0`
+5. `git push origin main --tags`
 -->
