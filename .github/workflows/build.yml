@@ -89,9 +89,9 @@ jobs:
 
       - name: Build rust
         run: |
-          echo "Building version ${{ jobs.info.outputs.version }}"
+          echo "Building version ${{ needs.info.outputs.version }}"
           cargo install cargo-edit
-          cargo set-version ${{ jobs.info.outputs.version }} -p cantari
+          cargo set-version ${{ needs.info.outputs.version }} -p cantari
           cargo test --all
           cargo build --release -vv
 
@@ -103,17 +103,17 @@ jobs:
           cp target/release/{cantari,cantari.exe} archive || true
           cp crates/cantari/engine_manifest.json archive
           cd archive
-          zip -r ../cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.zip .
+          zip -r ../cantari-${{ needs.info.outputs.version }}${{ matrix.suffix }}.zip .
           cd ..
-          mv cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.zip cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.vvpp
+          mv cantari-${{ needs.info.outputs.version }}${{ matrix.suffix }}.zip cantari-${{ needs.info.outputs.version }}${{ matrix.suffix }}.vvpp
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ jobs.info.outputs.version }}
+          tag_name: v${{ needs.info.outputs.version }}
           prerelease: true
           files: |
-            cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.vvpp
+            cantari-${{ needs.info.outputs.version }}${{ matrix.suffix }}.vvpp
   set-information:
     needs:
       - info
