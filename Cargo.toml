@@ -5,3 +5,9 @@ resolver = "2"
 [workspace.dependencies]
 worldline = { path = "./crates/worldline" }
 assets = { path = "./crates/assets" }
+
+[profile.dev]
+rpath = true
+
+[profile.release]
+rpath = true
