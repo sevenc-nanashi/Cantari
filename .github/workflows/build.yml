@@ -15,7 +15,31 @@ defaults:
     shell: bash
 
 jobs:
+  info:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ jobs.info.outputs.version }}
+      prerelease: ${{ jobs.info.outputs.prerelease }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ -z "${{ inputs.version }}" ]; then
+            VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          else
+            VERSION=${{ inputs.version }}
+          fi
+          if [[ $VERSION == *"-"* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "prerelease=${PRERELEASE}" >> $GITHUB_OUTPUT
   build:
+    needs:
+      - info
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-13]
@@ -34,22 +58,6 @@ jobs:
           curl.exe https://www.willus.com/archive/zip64/infozip_binaries_win64.zip -o zip64.zip
           7z x zip64.zip -oC:\tools
           echo "C:/tools" >> $GITHUB_PATH
-      - name: Determine version
-        id: version
-        run: |
-          if [ -z "${{ inputs.version }}" ]; then
-            VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
-          else
-            VERSION=${{ inputs.version }}
-          fi
-          if [[ $VERSION == *"-"* ]]; then
-            PRERELEASE=true
-          else
-            PRERELEASE=false
-          fi
-
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "prerelease=${PRERELEASE}" >> $GITHUB_OUTPUT
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -81,9 +89,9 @@ jobs:
 
       - name: Build rust
         run: |
-          echo "Building version ${{ steps.version.outputs.version }}"
+          echo "Building version ${{ jobs.info.outputs.version }}"
           cargo install cargo-edit
-          cargo set-version ${{ steps.version.outputs.version }} -p cantari
+          cargo set-version ${{ jobs.info.outputs.version }} -p cantari
           cargo test --all
           cargo build --release -vv
 
@@ -95,14 +103,44 @@ jobs:
           cp target/release/{cantari,cantari.exe} archive || true
           cp crates/cantari/engine_manifest.json archive
           cd archive
-          zip -r ../cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip .
+          zip -r ../cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.zip .
           cd ..
-          mv cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.zip cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.vvpp
+          mv cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.zip cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.vvpp
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          prerelease: ${{ steps.version.outputs.prerelease }}
+          tag_name: v${{ jobs.info.outputs.version }}
+          prerelease: true
           files: |
-            cantari-${{ steps.version.outputs.version }}${{ matrix.suffix }}.vvpp
+            cantari-${{ jobs.info.outputs.version }}${{ matrix.suffix }}.vvpp
+  set-information:
+    needs:
+      - info
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set information
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = "${{ needs.info.outputs.version }}"
+            const prerelease = "${{ needs.info.outputs.prerelease }}"
+            const body =
+              "使い方はここを参照してください：https://github.com/sevenc-nanashi/Cantari?tab=readme-ov-file#cantari--let-utaus-speak-on-voicevox" +
+              "Mac OS版は不安定です。`
+
+            const { data: release } = await github.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: `v${version}`,
+            })
+
+            await github.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              tag_name: `v${version}`,
+              prerelease,
+              body,
+            })
