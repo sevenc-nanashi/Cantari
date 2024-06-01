@@ -90,7 +90,7 @@ jobs:
         run: |
           mkdir archive
           cp -r target/release/{sample.vvm,*.html,dict} archive
-          cp target/release/{*.dylib,*.so,*.dll} archive || true
+          cp target/release/{*.dylib,*.so,*.so.*,*.dll} archive || true
           cp target/release/{cantari,cantari.exe} archive || true
           cp crates/cantari/engine_manifest.json archive
           cd archive

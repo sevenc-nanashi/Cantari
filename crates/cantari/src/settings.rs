@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 
 fn get_path() -> PathBuf {
-    let name = if cfg!(feature = "release") {
+    let name = if cfg!(not(debug_assertions)) {
         "cantari.json"
     } else {
         "cantari-dev.json"
