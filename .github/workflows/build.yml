@@ -18,8 +18,8 @@ jobs:
   info:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ jobs.info.outputs.version }}
-      prerelease: ${{ jobs.info.outputs.prerelease }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - name: Determine version
         id: version
