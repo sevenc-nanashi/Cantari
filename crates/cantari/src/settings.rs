@@ -33,7 +33,7 @@ pub struct V1Settings {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct V2Settings {
     pub paths: Vec<String>,
-    pub limit: usize,
+    pub ongen_limit: usize,
 }
 
 pub type LatestSettings = V2Settings;
@@ -66,13 +66,13 @@ pub async fn load_settings() -> LatestSettings {
             vec![]
         };
 
-        Settings::V2(V2Settings { paths, limit: 10 })
+        Settings::V2(V2Settings { paths, ongen_limit: 10 })
     });
 
     let settings = match settings {
         Settings::V1(v1) => Settings::V2(V2Settings {
             paths: v1.paths,
-            limit: 10,
+            ongen_limit: 10,
         }),
         other => other,
     };

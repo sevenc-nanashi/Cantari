@@ -12,6 +12,8 @@ const newPaths = ref<string[]>([]);
 const deletePaths = ref<string[]>([]);
 const newPathsInput = ref("");
 
+const ongenLimit = ref(settings.ongen_limit);
+
 const addPath = () => {
   newPaths.value.push(newPathsInput.value.trim());
   newPaths.value = Array.from(new Set(newPaths.value));
@@ -32,6 +34,7 @@ const submit = async () => {
     },
     body: JSON.stringify({
       paths,
+      ongenLimit: ongenLimit.value,
     }),
   });
   location.reload();
@@ -41,19 +44,28 @@ const submit = async () => {
 <template>
   <PageHeader />
   <ElDivider />
-  <div>
+  <section>
+    <h2>音源のパス</h2>
     <p>
       音源のパスを指定します。character.txtの入っているフォルダ、またはその1つ上を指定して下さい。
     </p>
-  </div>
-  <PathsTable v-model:deletePaths="deletePaths" :newPaths="newPaths" />
-  <div class="add-paths">
-    <ElInput
-      v-model="newPathsInput"
-      placeholder="C:/Users/Nanatsuki/AppData/Roaming/UTAU/voice"
-    />
-    <ElButton @click="addPath">追加</ElButton>
-  </div>
+    <PathsTable v-model:deletePaths="deletePaths" :newPaths="newPaths" />
+    <div class="add-path">
+      <ElInput
+        v-model="newPathsInput"
+        placeholder="C:/Users/Nanatsuki/AppData/Roaming/UTAU/voice"
+      />
+      <ElButton @click="addPath">追加</ElButton>
+    </div>
+  </section>
+  <section>
+    <h2>音源数上限</h2>
+    <p>
+      読み込む音源の上限を指定します。この数を超える音源は読み込まれません。
+      0を指定すると上限を無効にしますが、多すぎるとデータ準備が終わらなくなる可能性があります。
+    </p>
+    <ElInputNumber v-model="ongenLimit" :min="0" />
+  </section>
   <ElDivider />
   <p>
     変更をVoicevoxに反映するには、このボタンを押した後にVoicevoxを再起動する必要があります。
@@ -63,9 +75,16 @@ const submit = async () => {
 </template>
 
 <style scoped>
-.add-paths {
+section {
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 1em;
+  margin-bottom: 1em;
+}
+
+.add-path {
+  display: flex;
+  gap: 0.5em;
 }
 
 p {

@@ -131,10 +131,10 @@ impl Ongen {
 #[instrument]
 pub async fn setup_ongen() {
     info!("Setting up ongens...");
-    let paths = load_settings().await.paths;
+    let settings = load_settings().await;
 
     let mut roots = vec![];
-    for path in &paths {
+    for path in &settings.paths {
         for file in walkdir::WalkDir::new(path)
             .min_depth(1)
             .max_depth(3)
@@ -168,7 +168,13 @@ pub async fn setup_ongen() {
                 warn!("Failed to load ongen at {:?}: {}", path, e);
             }
         }
+
+        if ongens.len() >= settings.ongen_limit {
+            info!("Reached ongen limit of {}", settings.ongen_limit);
+            break;
+        }
     }
+    info!("Loaded {} ongens", ongens.len());
 
     ONGEN.get_or_init(|| Arc::new(RwLock::new(ongens)));
 }

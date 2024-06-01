@@ -16,7 +16,8 @@ pub async fn get_settings() -> Html<String> {
     let settings_json = serde_json::to_string(&settings).unwrap();
 
     let settings_start_index = html.find(SETTINGS_START).unwrap();
-    let settings_end_index = html.find(SETTINGS_END).unwrap();
+    let settings_end_index =
+        html[settings_start_index..].find(SETTINGS_END).unwrap() + settings_start_index;
 
     let mut new_html = html[..settings_start_index + SETTINGS_START.len()].to_string();
     new_html.push_str(&settings_json);
@@ -29,12 +30,14 @@ pub async fn get_settings() -> Html<String> {
 #[serde(rename_all = "camelCase")]
 pub struct PutSettingsBody {
     paths: Vec<String>,
+    ongen_limit: usize,
 }
 
 pub async fn put_settings(body: Json<PutSettingsBody>) -> Result<String> {
     let mut settings = load_settings().await;
 
     settings.paths.clone_from(&body.paths);
+    settings.ongen_limit = body.ongen_limit;
 
     write_settings(settings).await;
 
