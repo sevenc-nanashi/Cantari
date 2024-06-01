@@ -128,7 +128,7 @@ jobs:
             const prerelease = "${{ needs.info.outputs.prerelease }}"
             const body =
               "使い方はここを参照してください：https://github.com/sevenc-nanashi/Cantari?tab=readme-ov-file#cantari--let-utaus-speak-on-voicevox" +
-              "Mac OS版は不安定です。`
+              "Mac OS版は不安定です。"
 
             const { data: release } = await github.repos.getReleaseByTag({
               owner: context.repo.owner,
