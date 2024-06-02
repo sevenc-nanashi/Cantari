@@ -1,3 +1,4 @@
+use crate::write_settings;
 use anyhow::{anyhow, bail, Result};
 use image::io::Reader as ImageReader;
 use once_cell::sync::OnceCell;
@@ -131,7 +132,7 @@ impl Ongen {
 #[instrument]
 pub async fn setup_ongen() {
     info!("Setting up ongens...");
-    let settings = load_settings().await;
+    let mut settings = load_settings().await;
 
     let mut roots = vec![];
     for path in &settings.paths {
@@ -175,6 +176,15 @@ pub async fn setup_ongen() {
         }
     }
     info!("Loaded {} ongens", ongens.len());
+
+    for (uuid, ongen) in &ongens {
+        if !settings.ongen_settings.contains_key(uuid) {
+            info!("Adding default settings for {}", ongen.name());
+            settings.ongen_settings.insert(*uuid, Default::default());
+        }
+    }
+
+    write_settings(&settings).await;
 
     ONGEN.get_or_init(|| Arc::new(RwLock::new(ongens)));
 }

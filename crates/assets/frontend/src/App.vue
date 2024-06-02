@@ -3,7 +3,7 @@ import { ref } from "vue";
 import PageHeader from "./components/PageHeader.vue";
 import PageFooter from "./components/PageFooter.vue";
 import PathsTable from "./components/PathsTable.vue";
-import { useSettings } from "./composables/useSettings.ts";
+import { useOngens, useSettings } from "./composables/useData.ts";
 import { ElMessage } from "element-plus";
 
 const settings = useSettings();
@@ -11,6 +11,10 @@ const settings = useSettings();
 const newPaths = ref<string[]>([]);
 const deletePaths = ref<string[]>([]);
 const newPathsInput = ref("");
+
+const ongens = ref(structuredClone(useOngens()));
+
+const ongenSettings = ref(structuredClone(settings.ongen_settings));
 
 const ongenLimit = ref(settings.ongen_limit);
 
@@ -35,6 +39,7 @@ const submit = async () => {
     body: JSON.stringify({
       paths,
       ongenLimit: ongenLimit.value,
+      ongenSettings: ongenSettings.value,
     }),
   });
   location.reload();
@@ -42,6 +47,7 @@ const submit = async () => {
 </script>
 
 <template>
+  <div class="hider" :data-show="hasSent"></div>
   <PageHeader />
   <ElDivider />
   <section>
@@ -66,6 +72,15 @@ const submit = async () => {
     </p>
     <ElInputNumber v-model="ongenLimit" :min="0" />
   </section>
+  <section>
+    <h2>音源設定</h2>
+    <OngenSettings
+      v-if="Object.keys(ongens).length > 0"
+      v-model:ongenSettings="ongenSettings"
+      :ongens
+    />
+    <p v-else>音源がありません。</p>
+  </section>
   <ElDivider />
   <p>
     変更をVoicevoxに反映するには、このボタンを押した後にVoicevoxを再起動する必要があります。
@@ -75,12 +90,6 @@ const submit = async () => {
 </template>
 
 <style scoped>
-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1em;
-  margin-bottom: 1em;
-}
 
 .add-path {
   display: flex;
@@ -90,5 +99,24 @@ section {
 p {
   margin: 0;
   padding: 0;
+}
+
+.hider {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background-color: #fff8;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+
+  &[data-show="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    cursor: wait;
+  }
 }
 </style>

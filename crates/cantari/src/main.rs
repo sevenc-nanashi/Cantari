@@ -2,6 +2,7 @@ mod error;
 mod math;
 mod model;
 mod ongen;
+mod ongen_settings;
 mod oto;
 mod routes;
 mod settings;
@@ -106,6 +107,7 @@ async fn main_impl(args: Cli) -> Result<()> {
             "/settings",
             get(routes::settings::get_settings).put(routes::settings::put_settings),
         )
+        .route("/icons/:uuid.png", get(routes::settings::get_icon))
         .layer(CorsLayer::permissive())
         .layer(
             trace::TraceLayer::new_for_http()
@@ -117,7 +119,7 @@ async fn main_impl(args: Cli) -> Result<()> {
     let has_settings = settings_path.exists();
     if !has_settings {
         info!("Settings file does not exist: {}", settings_path.display());
-        write_settings(load_settings().await).await;
+        write_settings(&load_settings().await).await;
     }
 
     let addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;

@@ -33,3 +33,20 @@ body {
   max-width: 800px;
   gap: 1rem;
 }
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sub-container {
+  border-left: 2px solid var(--el-border-color);
+  padding-left: 1rem;
+
+  margin-top: 1rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}

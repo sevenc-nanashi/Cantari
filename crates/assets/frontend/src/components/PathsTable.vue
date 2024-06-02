@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useSettings } from "../composables/useSettings.ts";
+import { useSettings } from "../composables/useData.ts";
 import { computed } from "vue";
 
 const props = defineProps<{ newPaths: string[] }>();

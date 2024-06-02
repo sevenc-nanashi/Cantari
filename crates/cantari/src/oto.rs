@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use anyhow::Result;
-use once_cell::sync::Lazy;
 use regex_macro::regex;
 use serde::Serialize;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::warn;
 
@@ -21,8 +21,6 @@ enum OtoCache {
     Error(String),
 }
 
-static CACHE: Lazy<RwLock<HashMap<String, OtoCache>>> = Lazy::new(|| RwLock::new(HashMap::new()));
-
 #[derive(Debug, Clone, Serialize)]
 pub struct Oto {
     pub path: PathBuf,
@@ -33,6 +31,9 @@ pub struct Oto {
     pub cut_off: f64,
     pub preutter: f64,
     pub overlap: f64,
+
+    #[serde(skip)]
+    cache: Arc<RwLock<Option<OtoCache>>>,
 }
 
 impl Oto {
@@ -62,6 +63,8 @@ impl Oto {
             cut_off: captures["cut_off"].parse()?,
             preutter: captures["preutter"].parse()?,
             overlap: captures["overlap"].parse()?,
+
+            cache: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -92,8 +95,9 @@ impl Oto {
 
     pub async fn read(&self) -> Result<OtoData> {
         {
-            let cache = CACHE.read().await;
-            if let Some(data) = cache.get(&self.alias) {
+            let cache = self.cache.read().await;
+            if cache.is_some() {
+                let data = cache.as_ref().unwrap();
                 return match data {
                     OtoCache::Oto(data) => Ok(data.clone()),
                     OtoCache::Error(e) => Err(anyhow!("Failed to read oto: {}", e)),
@@ -104,15 +108,12 @@ impl Oto {
         let data = self.read_inner().await;
         match &data {
             Ok(data) => {
-                let mut cache = CACHE.write().await;
-                cache.insert(self.alias.clone(), OtoCache::Oto(data.clone()));
+                let mut cache = self.cache.write().await;
+                *cache = Some(OtoCache::Oto(data.clone()));
             }
             Err(err) => {
-                let mut cache = CACHE.write().await;
-                cache.insert(
-                    self.alias.clone(),
-                    OtoCache::Error(err.to_string().replace('\n', " ")),
-                );
+                let mut cache = self.cache.write().await;
+                *cache = Some(OtoCache::Error(err.to_string()));
             }
         }
         data

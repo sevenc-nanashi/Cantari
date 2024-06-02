@@ -8,6 +8,9 @@ dependencies:
   element-plus:
     specifier: ^2.7.3
     version: 2.7.3(vue@3.4.27)
+  fast-base64:
+    specifier: ^0.1.8
+    version: 0.1.8
   vue:
     specifier: ^3.4.21
     version: 3.4.27(typescript@5.4.5)
@@ -793,6 +796,10 @@ packages:
     dependencies:
       '@types/estree': 1.0.5
     dev: true
+
+  /fast-base64@0.1.8:
+    resolution: {integrity: sha512-LICiPjlLyh7/P3gcJYDjKEIX41odzqny1VHSnPsAlBb/zcSJJPYrSNHs54e2TytDRTwHZl7KG5c33IMLdT+9Eg==}
+    dev: false
 
   /fast-glob@3.3.2:
     resolution: {integrity: sha512-oX2ruAFQwf/Orj8m737Y5adxDQO0LAB7/S5MnxCdTNDd4p6BsyIVsv9JQsATbTSq8KHRpLwIHbVlUNatxd+1Ow==}

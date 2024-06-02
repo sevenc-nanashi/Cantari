@@ -41,6 +41,7 @@ async-walkdir = "1.0.0"
 async-recursion = "1.1.1"
 tempfile = "3.10.1"
 futures = "0.3.30"
+serde_with = { version = "3.8.1", features = ["base64"] }
 
 [dev-dependencies]
 cargo-license = "0.5.1"

@@ -125,7 +125,7 @@ jobs:
         with:
           script: |
             const version = "${{ needs.info.outputs.version }}"
-            const prerelease = "${{ needs.info.outputs.prerelease }}"
+            const prerelease = "${{ needs.info.outputs.prerelease }}" === "true"
             const body =
               "使い方はここを参照してください：https://github.com/sevenc-nanashi/Cantari?tab=readme-ov-file#cantari--let-utaus-speak-on-voicevox\n\n" +
               "Mac OS版は不安定です。"
@@ -143,4 +143,5 @@ jobs:
               tag_name: `v${version}`,
               prerelease,
               body,
+              make_latest: !prerelease,
             })

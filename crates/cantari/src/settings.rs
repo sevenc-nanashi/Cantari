@@ -1,8 +1,10 @@
-use std::path::PathBuf;
-
+use crate::ongen_settings::OngenSettings;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use tracing::error;
+use uuid::Uuid;
 
 pub fn get_settings_path() -> PathBuf {
     let name = if cfg!(not(debug_assertions)) {
@@ -16,27 +18,25 @@ pub fn get_settings_path() -> PathBuf {
     home.join(".config").join(name)
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "version")]
-pub enum Settings {
-    #[serde(rename = "1")]
-    V1(V1Settings),
-    #[serde(rename = "2")]
-    V2(V2Settings),
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct V1Settings {
-    pub paths: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct V2Settings {
+#[serde(default)]
+pub struct Settings {
+    pub format_version: u8,
     pub paths: Vec<String>,
     pub ongen_limit: usize,
+    pub ongen_settings: HashMap<Uuid, OngenSettings>,
 }
 
-pub type LatestSettings = V2Settings;
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            format_version: 1,
+            paths: vec![],
+            ongen_limit: 10,
+            ongen_settings: HashMap::new(),
+        }
+    }
+}
 
 async fn load_settings_inner() -> Result<Settings> {
     let path = get_settings_path();
@@ -48,12 +48,12 @@ async fn load_settings_inner() -> Result<Settings> {
     Ok(settings)
 }
 
-pub async fn load_settings() -> LatestSettings {
+pub async fn load_settings() -> Settings {
     let path = get_settings_path();
 
     let settings = load_settings_inner().await;
 
-    let settings = settings.unwrap_or_else(|e| {
+    settings.unwrap_or_else(|e| {
         error!("Failed to load settings from {}: {}", path.display(), e);
         error!("Using default settings");
 
@@ -66,29 +66,17 @@ pub async fn load_settings() -> LatestSettings {
             vec![]
         };
 
-        Settings::V2(V2Settings { paths, ongen_limit: 10 })
-    });
-
-    let settings = match settings {
-        Settings::V1(v1) => Settings::V2(V2Settings {
-            paths: v1.paths,
-            ongen_limit: 10,
-        }),
-        other => other,
-    };
-
-    #[allow(irrefutable_let_patterns)]
-    if let Settings::V2(settings) = &settings {
-        settings.clone()
-    } else {
-        unreachable!()
-    }
+        Settings {
+            paths,
+            ..Default::default()
+        }
+    })
 }
 
-pub async fn write_settings(settings: LatestSettings) {
+pub async fn write_settings(settings: &Settings) {
     let path = get_settings_path();
 
-    let settings = serde_json::to_string_pretty(&Settings::V2(settings)).unwrap();
+    let settings = serde_json::to_string_pretty(&settings).unwrap();
 
     tokio::fs::create_dir_all(path.parent().unwrap())
         .await
