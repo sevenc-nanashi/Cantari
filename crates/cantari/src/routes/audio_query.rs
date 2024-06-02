@@ -1,4 +1,8 @@
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    ongen::{get_ongen_style_from_id, ONGEN},
+    settings::load_settings,
+};
 use anyhow::anyhow;
 use assets::{open_jtalk_dic, sample_vvm};
 use std::sync::Arc;
@@ -79,6 +83,67 @@ impl From<&HttpAudioQuery> for crate::model::AudioQueryModel {
     }
 }
 
+fn modify_speed(
+    accent_phrases: &[crate::model::AccentPhraseModel],
+) -> Vec<crate::model::AccentPhraseModel> {
+    let audio_query = crate::model::AudioQueryModel {
+        accent_phrases: accent_phrases.to_vec(),
+        speed_scale: 1.0,
+        pitch_scale: 0.0,
+        intonation_scale: 1.0,
+        volume_scale: 1.0,
+        pre_phoneme_length: 0.1,
+        post_phoneme_length: 0.1,
+        output_sampling_rate: Number::from(24000),
+        output_stereo: false,
+        kana: None,
+    };
+
+    let audio_query = audio_query.apply_speed_scale(SPEED_SCALE);
+
+    audio_query.accent_phrases
+}
+
+async fn modify_pitch(
+    accent_phrases: &[crate::model::AccentPhraseModel],
+    speaker: u32,
+) -> Result<Vec<crate::model::AccentPhraseModel>> {
+    let ongens = ONGEN.get().unwrap().read().await;
+    let settings = load_settings().await;
+
+    let (ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, speaker)
+        .await
+        .ok_or_else(|| crate::error::Error::CharacterNotFound)?;
+
+    let audio_query = crate::model::AudioQueryModel {
+        accent_phrases: accent_phrases.to_vec(),
+        speed_scale: 1.0,
+        pitch_scale: 0.0,
+        intonation_scale: 1.0,
+        volume_scale: 1.0,
+        pre_phoneme_length: 0.1,
+        post_phoneme_length: 0.1,
+        output_sampling_rate: Number::from(24000),
+        output_stereo: false,
+        kana: None,
+    };
+
+    let audio_query = audio_query.apply_intonation_scale(INTONATION_SCALE);
+
+    let mut accent_phrases = audio_query.accent_phrases;
+
+    for accent_phrase in &mut accent_phrases {
+        for mora in &mut accent_phrase.moras {
+            if mora.pitch == 0.0f32 {
+                continue;
+            }
+            mora.pitch += (style_settings.formant_shift as f32 / 50.0f32);
+        }
+    }
+
+    Ok(accent_phrases)
+}
+
 pub async fn post_audio_query(
     Query(query): Query<AudioQueryParams>,
 ) -> Result<Json<HttpAudioQuery>> {
@@ -88,9 +153,9 @@ pub async fn post_audio_query(
         .await
         .map_err(|e| Error::InferenceFailed(anyhow!("Failed to create audio query: {}", e)))?;
 
-    let mut audio_query = crate::model::AudioQueryModel::from(&audio_query)
-        .apply_speed_scale(SPEED_SCALE)
-        .apply_intonation_scale(INTONATION_SCALE);
+    let mut audio_query = crate::model::AudioQueryModel::from(&audio_query);
+    audio_query.accent_phrases = modify_speed(&audio_query.accent_phrases);
+    audio_query.accent_phrases = modify_pitch(&audio_query.accent_phrases, query.speaker).await?;
 
     audio_query.pre_phoneme_length = 0.1;
     audio_query.post_phoneme_length = 0.1;
@@ -107,31 +172,21 @@ pub async fn post_accent_phrases(
         .await
         .map_err(|e| Error::InferenceFailed(anyhow!("Failed to create accent phrases: {}", e)))?;
 
-    let audio_query = crate::model::AudioQueryModel {
-        accent_phrases: accent_phrases.iter().map(|x| x.into()).collect(),
-        speed_scale: 1.0,
-        pitch_scale: 0.0,
-        intonation_scale: 1.0,
-        volume_scale: 1.0,
-        pre_phoneme_length: 0.1,
-        post_phoneme_length: 0.1,
-        output_sampling_rate: Number::from(24000),
-        output_stereo: false,
-        kana: None,
-    };
+    let accent_phrases = accent_phrases
+        .iter()
+        .map(crate::model::AccentPhraseModel::from)
+        .collect::<Vec<_>>();
+    let accent_phrases = modify_speed(&accent_phrases);
+    let accent_phrases = modify_pitch(&accent_phrases, query.speaker).await?;
 
-    let audio_query = audio_query
-        .apply_speed_scale(SPEED_SCALE)
-        .apply_intonation_scale(INTONATION_SCALE);
-
-    Ok(Json(audio_query.accent_phrases))
+    Ok(Json(accent_phrases))
 }
 
 #[duplicate_item(
-    name               synthesizer_method       should_apply_speed_scale should_apply_intonation_scale;
-    [post_mora_data ]  [replace_mora_data]      [true]                   [true];
-    [post_mora_pitch]  [replace_mora_pitch]     [false]                  [true];
-    [post_mora_length] [replace_phoneme_length] [true]                   [false];
+    name               synthesizer_method       modifies_speed modifies_pitch;
+    [post_mora_data ]  [replace_mora_data]      [true]         [true];
+    [post_mora_pitch]  [replace_mora_pitch]     [false]        [true];
+    [post_mora_length] [replace_phoneme_length] [true]         [false];
 )]
 pub async fn name(
     Query(query): Query<AccentPhraseModifyParams>,
@@ -145,32 +200,22 @@ pub async fn name(
         .await
         .map_err(|e| Error::InferenceFailed(anyhow!("Operation failed: {}", e)))?;
 
-    let audio_query = crate::model::AudioQueryModel {
-        accent_phrases: new_accent_phrases.iter().map(|x| x.into()).collect(),
-        speed_scale: 1.0,
-        pitch_scale: 0.0,
-        intonation_scale: 1.0,
-        volume_scale: 1.0,
-        pre_phoneme_length: 0.1,
-        post_phoneme_length: 0.1,
-        output_sampling_rate: Number::from(24000),
-        output_stereo: false,
-        kana: None,
+    let accent_phrases = new_accent_phrases
+        .iter()
+        .map(crate::model::AccentPhraseModel::from)
+        .collect::<Vec<_>>();
+    let accent_phrases = if modifies_speed {
+        modify_speed(&accent_phrases)
+    } else {
+        accent_phrases
+    };
+    let accent_phrases = if modifies_pitch {
+        modify_pitch(&accent_phrases, query.speaker).await?
+    } else {
+        accent_phrases
     };
 
-    let audio_query = audio_query
-        .apply_speed_scale(if should_apply_speed_scale {
-            SPEED_SCALE
-        } else {
-            1.0
-        })
-        .apply_intonation_scale(if should_apply_intonation_scale {
-            INTONATION_SCALE
-        } else {
-            1.0
-        });
-
-    Ok(Json(audio_query.accent_phrases))
+    Ok(Json(accent_phrases))
 }
 
 pub async fn get_is_initialized_speaker() -> Json<bool> {

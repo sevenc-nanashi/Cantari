@@ -3,15 +3,19 @@ use crate::{
     error::Result,
     math::{smooth, MidiNote},
     model::{AccentPhraseModel, AudioQueryModel},
-    ongen::ONGEN,
+    ongen::{get_ongen_style_from_id, ONGEN},
     oto::{Oto, OtoData},
+    settings::load_settings,
     tempdir::TEMPDIR,
 };
 use async_recursion::async_recursion;
 use axum::{extract::Query, Json};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use wav_io::header::WavHeader;
@@ -37,6 +41,14 @@ struct PhraseSource<'a> {
     ongen: &'a crate::ongen::Ongen,
     speaker: u32,
     volume_scale: f32,
+
+    key_shift: i8,
+    whisper: bool,
+    formant_shift: i8,
+    breathiness: u8,
+    tension: i8,
+    peak_compression: u8,
+    voicing: u8,
 }
 
 impl PhraseSource<'_> {
@@ -115,11 +127,19 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let freq = if mora.pitch == 0.0 {
             // 無声化は前の音高を引き継ぐ
             prev_freq
+        } else if source.whisper {
+            mora.pitch
         } else {
             mora.pitch.exp()
         };
         let kana = text_to_oto(&mora.text);
         let freq_midi = MidiNote::from_frequency(freq);
+        let freq_midi_number = freq_midi.0 as i32;
+        let freq_midi_number = (freq_midi_number + source.key_shift as i32).clamp(
+            MidiNote::from_str("C1").unwrap().0 as i32,
+            MidiNote::from_str("B7").unwrap().0 as i32,
+        ) as u8;
+        let freq_midi = MidiNote(freq_midi_number);
         let length = ((mora.consonant_length.unwrap_or(0.0) + mora.vowel_length) as f64).max(0.035);
         let (prefix, suffix) = source
             .ongen
@@ -192,12 +212,12 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             modulation: 0.0,
             tempo: 0.0,
             pitch_bend: vec![0],
-            flag_g: 0,
+            flag_g: source.formant_shift as _,
             flag_o: 0,
-            flag_p: 86,
-            flag_mt: 0,
-            flag_mb: 0,
-            flag_mv: 100,
+            flag_p: source.peak_compression as _,
+            flag_mt: source.tension as _,
+            flag_mb: source.breathiness as _,
+            flag_mv: source.voicing as _,
         };
 
         synthesizer.add_request(&request, start, skip, adjusted_length, 5.0, 35.0);
@@ -232,26 +252,33 @@ pub async fn post_synthesis(
     Query(query): Query<AudioQueryQuery>,
     Json(audio_query): Json<HttpAudioQuery>,
 ) -> Result<Vec<u8>> {
+    let ongens = ONGEN.get().unwrap().read().await;
+    let settings = load_settings().await;
     let audio_query = AudioQueryModel::from(&audio_query)
         .apply_speed_scale(audio_query.speed_scale)
         .apply_pitch_scale(audio_query.pitch_scale)
         .apply_intonation_scale(audio_query.intonation_scale);
 
-    let ongens = ONGEN.get().unwrap().read().await;
-    let ongen = ongens
-        .values()
-        .find(|ongen| ongen.id() == query.speaker)
-        .unwrap();
+    let (ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, query.speaker)
+        .await
+        .ok_or_else(|| crate::error::Error::CharacterNotFound)?;
 
     let results = futures::future::join_all(audio_query.accent_phrases.iter().enumerate().map(
         |(i, accent_phrase)| {
             let accent_phrases = audio_query.accent_phrases.clone();
 
             async move {
-                let prev_freq = if i == 0 {
-                    440.0f32.ln()
-                } else {
-                    accent_phrases[i - 1].moras.last().unwrap().pitch.exp()
+                // let prev_freq =
+                //     if i == 0 {
+                //     440.0f32
+                // } else {
+                //     accent_phrases[i - 1].moras.last().unwrap().pitch.exp()
+                // };
+                let prev_freq = match (i, style_settings.whisper) {
+                    (0, false) => 440.0f32,
+                    (0, true) => 440.0f32.ln(),
+                    (_, false) => accent_phrases[i - 1].moras.last().unwrap().pitch.exp(),
+                    (_, true) => accent_phrases[i - 1].moras.last().unwrap().pitch,
                 };
                 let phrase_source = PhraseSource {
                     prev_freq,
@@ -259,6 +286,14 @@ pub async fn post_synthesis(
                     ongen,
                     speaker: query.speaker,
                     volume_scale: audio_query.volume_scale,
+
+                    key_shift: style_settings.key_shift,
+                    whisper: style_settings.whisper,
+                    formant_shift: style_settings.formant_shift,
+                    breathiness: style_settings.breathiness,
+                    tension: style_settings.tension,
+                    peak_compression: style_settings.peak_compression,
+                    voicing: style_settings.voicing,
                 };
                 let hash = phrase_source.hash();
                 let cache_hit = {

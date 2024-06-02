@@ -8,17 +8,19 @@ mod routes;
 mod settings;
 mod tempdir;
 
-use crate::settings::{get_settings_path, load_settings, write_settings};
+use crate::{
+    routes::{audio_query::get_or_initialize_synthesizer, user_dict::get_or_initialize_user_dict},
+    settings::{get_settings_path, load_settings, write_settings},
+};
 use anyhow::Result;
 use axum::{
+    extract::DefaultBodyLimit,
     response::{IntoResponse, Redirect},
     routing::{delete, get, post, put},
     Router,
 };
 use clap::Parser;
 use ongen::ONGEN;
-use routes::audio_query::get_or_initialize_synthesizer;
-use routes::user_dict::get_or_initialize_user_dict;
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace};
 use tracing::{info, Level};
@@ -107,13 +109,14 @@ async fn main_impl(args: Cli) -> Result<()> {
             "/settings",
             get(routes::settings::get_settings).put(routes::settings::put_settings),
         )
-        .route("/icons/:uuid.png", get(routes::settings::get_icon))
+        .route("/icons/:uuid", get(routes::settings::get_icon))
         .layer(CorsLayer::permissive())
         .layer(
             trace::TraceLayer::new_for_http()
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
-        );
+        )
+        .layer(DefaultBodyLimit::disable());
 
     let settings_path = get_settings_path();
     let has_settings = settings_path.exists();

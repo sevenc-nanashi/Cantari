@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { Ongen, OngenSettings } from "../composables/useData";
+import { Ref, computed, ref, watch } from "vue";
+import { Ongen, OngenSettings, StyleSettings } from "../composables/useData";
 import { toBase64 } from "fast-base64";
 
 const props = defineProps<{ ongens: Record<string, Ongen> }>();
@@ -22,10 +22,11 @@ watch(
 );
 const selectedStyleIndex = ref<number>(0);
 
-const defaultStyleSetting = {
+const defaultStyleSetting: StyleSettings = {
   name: "新規スタイル",
   portrait: null,
   icon: null,
+  key_shift: 0,
   whisper: false,
   formant_shift: 0,
   breathiness: 0,
@@ -65,10 +66,13 @@ const selectedStyleSettings = computed(() => {
 
 const styleIconInput = ref<HTMLInputElement | null>(null);
 
-const createUploadIcon = (attributeName: "icon" | "portrait") => {
+const createUploadImage = (
+  attributeName: "icon" | "portrait",
+  inputRef: Ref<HTMLInputElement | null>,
+) => {
   return async () => {
-    if (styleIconInput.value && styleIconInput.value.files) {
-      const file = styleIconInput.value.files[0];
+    if (inputRef.value && inputRef.value.files) {
+      const file = inputRef.value.files[0];
       if (file) {
         const base64 = await toBase64(new Uint8Array(await file.arrayBuffer()));
         if (!selectedOngen.value) throw new Error("selectedOngen is null");
@@ -79,7 +83,7 @@ const createUploadIcon = (attributeName: "icon" | "portrait") => {
     }
   };
 };
-const createClearIcon = (attributeName: "icon" | "portrait") => {
+const createClearImage = (attributeName: "icon" | "portrait") => {
   return () => {
     if (selectedOngen.value) {
       selectedStyleSettings.value[attributeName] = null;
@@ -92,8 +96,8 @@ const changeStyleIcon = () => {
     styleIconInput.value.click();
   }
 };
-const uploadStyleIcon = createUploadIcon("icon");
-const clearStyleIcon = createClearIcon("icon");
+const uploadStyleIcon = createUploadImage("icon", styleIconInput);
+const clearStyleIcon = createClearImage("icon");
 
 const stylePortraitInput = ref<HTMLInputElement | null>(null);
 
@@ -102,8 +106,18 @@ const changeStylePortrait = () => {
     stylePortraitInput.value.click();
   }
 };
-const uploadStylePortrait = createUploadIcon("portrait");
-const clearStylePortrait = createClearIcon("portrait");
+const uploadStylePortrait = createUploadImage("portrait", stylePortraitInput);
+const clearStylePortrait = createClearImage("portrait");
+
+const deleteSelectedStyle = () => {
+  if (selectedOngen.value) {
+    ongenSettings.value[selectedOngen.value].style_settings.splice(
+      selectedStyleIndex.value,
+      1,
+    );
+    selectedStyleIndex.value = 0;
+  }
+};
 
 const styleFlags = [
   {
@@ -126,13 +140,13 @@ const styleFlags = [
   },
   {
     key: "breathiness",
-    label: "息の強さ（Mt）",
+    label: "息の強さ（Mb）",
     max: 100,
     min: -100,
   },
   {
     key: "voicing",
-    label: "声の強さ（Mt）",
+    label: "声の強さ（Mv）",
     max: 100,
     min: 0,
   },
@@ -193,7 +207,14 @@ const formatFlagValue = (value: number) => {
           </div>
         </ElOption>
         <template #footer>
-          <ElButton plain @click="createNewStyle">作成</ElButton>
+          <ElButton
+            plain
+            @click="createNewStyle"
+            :disabled="
+              ongenSettings[selectedOngen].style_settings.length >= 255
+            "
+            >作成</ElButton
+          >
         </template>
       </ElSelect>
 
@@ -282,13 +303,41 @@ const formatFlagValue = (value: number) => {
               />
             </div>
             <div class="style-flag">
+              <h5>音階調整</h5>
+              <p class="style-flag-description">
+                多音階音源でのみ有効です。
+                使う音源を選ぶ時に使う音階をずらします。
+                <!-- TODO：もっとわかりやすくする -->
+              </p>
+              <ElInputNumber
+                v-model="selectedStyleSettings.key_shift"
+                class="style-flag-input"
+                :min="-127"
+                :max="127"
+              />
+            </div>
+            <div class="style-flag">
               <h5>ささやき（不安定）</h5>
-              <p class="whisper-note">
+              <p class="style-flag-description">
                 ささやき音声はバグにより生まれたものを再現したものです。まともに動く保証はありません。
               </p>
               <ElCheckbox v-model="selectedStyleSettings.whisper" />
             </div>
           </div>
+        </section>
+        <section>
+          <h4>削除</h4>
+          <p v-if="selectedStyleIndex === 0">
+            「ノーマル」スタイルは削除できません。
+          </p>
+          <p v-else>このスタイルを削除します。</p>
+          <ElButton
+            type="danger"
+            :disabled="selectedStyleIndex === 0"
+            @click="deleteSelectedStyle()"
+          >
+            削除
+          </ElButton>
         </section>
       </div>
     </section>
@@ -325,11 +374,11 @@ const formatFlagValue = (value: number) => {
   }
 }
 .style-portrait {
-  width: 6rem;
   height: 10rem;
   border-radius: 0.5rem;
 
   &.dummy {
+    width: 6rem;
     background-color: #ccc;
     display: grid;
     place-items: center;
@@ -367,7 +416,7 @@ const formatFlagValue = (value: number) => {
       width: 100%;
     }
 
-    .whisper-note {
+    .style-flag-description {
       font-size: 0.8rem;
       color: #666;
       word-break: keep-all;

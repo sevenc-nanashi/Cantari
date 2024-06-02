@@ -1,10 +1,13 @@
 use crate::ongen_settings::OngenSettings;
 use anyhow::Result;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use tracing::error;
+use std::{collections::HashMap, path::PathBuf};
+use tokio::sync::Mutex;
+use tracing::{error, info};
 use uuid::Uuid;
+
+static SETTINGS: OnceCell<Mutex<Settings>> = OnceCell::new();
 
 pub fn get_settings_path() -> PathBuf {
     let name = if cfg!(not(debug_assertions)) {
@@ -49,6 +52,11 @@ async fn load_settings_inner() -> Result<Settings> {
 }
 
 pub async fn load_settings() -> Settings {
+    if let Some(settings) = SETTINGS.get() {
+        let settings = settings.lock().await;
+        return settings.clone();
+    }
+    info!("Loading settings...");
     let path = get_settings_path();
 
     let settings = load_settings_inner().await;
@@ -73,10 +81,22 @@ pub async fn load_settings() -> Settings {
     })
 }
 
-pub async fn write_settings(settings: &Settings) {
+pub async fn write_settings(new_settings: &Settings) {
     let path = get_settings_path();
 
-    let settings = serde_json::to_string_pretty(&settings).unwrap();
+    match SETTINGS.get() {
+        Some(settings) => {
+            info!("Updating settings...");
+            let mut settings = settings.lock().await;
+            *settings = new_settings.clone();
+        }
+        None => {
+            info!("Initializing settings...");
+            SETTINGS.set(Mutex::new(new_settings.clone())).unwrap();
+        }
+    }
+
+    let settings = serde_json::to_string_pretty(&new_settings).unwrap();
 
     tokio::fs::create_dir_all(path.parent().unwrap())
         .await

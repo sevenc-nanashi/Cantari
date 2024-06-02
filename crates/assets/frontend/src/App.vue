@@ -4,7 +4,7 @@ import PageHeader from "./components/PageHeader.vue";
 import PageFooter from "./components/PageFooter.vue";
 import PathsTable from "./components/PathsTable.vue";
 import { useOngens, useSettings } from "./composables/useData.ts";
-import { ElMessage } from "element-plus";
+import { ElLoading, ElMessage } from "element-plus";
 
 const settings = useSettings();
 
@@ -24,14 +24,17 @@ const addPath = () => {
   newPathsInput.value = "";
 };
 
-const hasSent = ref(false);
+const applying = ref(false);
 const submit = async () => {
   const paths = settings.paths
     .concat(newPaths.value)
     .filter((path) => !deletePaths.value.includes(path));
-  hasSent.value = true;
-  ElMessage("反映中...");
-  await fetch("/settings", {
+  applying.value = true;
+  const loading = ElLoading.service({
+    lock: true,
+    text: "反映中...",
+  });
+  const res = await fetch("/settings", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -42,12 +45,21 @@ const submit = async () => {
       ongenSettings: ongenSettings.value,
     }),
   });
+  if (res.ok) {
+    location.reload();
+  } else {
+    loading.close();
+    applying.value = false;
+    ElMessage.error("エラーが発生しました。");
+  }
+};
+
+const reset = () => {
   location.reload();
 };
 </script>
 
 <template>
-  <div class="hider" :data-show="hasSent"></div>
   <PageHeader />
   <ElDivider />
   <section>
@@ -85,12 +97,26 @@ const submit = async () => {
   <p>
     変更をVoicevoxに反映するには、このボタンを押した後にVoicevoxを再起動する必要があります。
   </p>
-  <ElButton type="primary" @click="submit" :disabled="hasSent">反映</ElButton>
+  <ElButton
+    type="primary"
+    @click="submit"
+    :disabled="applying"
+    native-type="submit"
+    >反映</ElButton
+  >
+  <ElButton
+    type="danger"
+    class="reset"
+    plain
+    @click="reset"
+    :disabled="applying"
+    native-type="reset"
+    >反映せずリセット</ElButton
+  >
   <PageFooter />
 </template>
 
 <style scoped>
-
 .add-path {
   display: flex;
   gap: 0.5em;
@@ -107,6 +133,7 @@ p {
   left: 0;
   width: 100%;
   height: 100%;
+  z-index: 1000;
 
   background-color: #fff8;
   opacity: 0;
@@ -118,5 +145,8 @@ p {
     pointer-events: auto;
     cursor: wait;
   }
+}
+.reset {
+  margin: 0;
 }
 </style>

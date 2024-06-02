@@ -2,6 +2,9 @@
 members = ["crates/*"]
 resolver = "2"
 
+[workspace.package]
+edition = "2021"
+
 [workspace.dependencies]
 worldline = { path = "./crates/worldline" }
 assets = { path = "./crates/assets" }

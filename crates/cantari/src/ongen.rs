@@ -1,5 +1,7 @@
+use crate::ongen_settings::StyleSettings;
 use crate::write_settings;
 use anyhow::{anyhow, bail, Result};
+use educe::Educe;
 use image::io::Reader as ImageReader;
 use once_cell::sync::OnceCell;
 use regex_macro::regex;
@@ -15,13 +17,16 @@ use crate::settings::load_settings;
 
 pub static ONGEN: OnceCell<Arc<RwLock<HashMap<Uuid, Ongen>>>> = OnceCell::new();
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Educe, Clone, Serialize)]
+#[educe(Debug)]
 pub struct Ongen {
     pub uuid: Uuid,
     pub root: PathBuf,
     pub info: HashMap<String, String>,
+    #[educe(Debug(ignore))]
     pub prefix_suffix_map: HashMap<String, (String, String)>,
-    pub oto: HashMap<String, Oto>,
+    #[educe(Debug(ignore))]
+    pub oto: Arc<HashMap<String, Oto>>,
 }
 
 impl Ongen {
@@ -102,7 +107,7 @@ impl Ongen {
             root,
             info,
             prefix_suffix_map,
-            oto: all_oto,
+            oto: Arc::new(all_oto),
         })
     }
 
@@ -119,13 +124,16 @@ impl Ongen {
     pub async fn read_image(&self) -> Option<Vec<u8>> {
         let image_path = self.info.get("image")?.replace('\\', "/");
         let path = self.root.join(image_path.trim_start_matches('/'));
-        let image_loaded = ImageReader::open(path).unwrap().decode().unwrap();
-        let mut image = Vec::new();
-        image_loaded
-            .write_to(&mut Cursor::new(&mut image), image::ImageFormat::Png)
+        let image = ImageReader::open(path).unwrap().decode().unwrap();
+        // 256x256にリサイズされてるので合わせる
+        // https://github.com/VOICEVOX/voicevox_resource/blob/main/scripts/resize.sh
+        let image = image.resize(256, 256, image::imageops::FilterType::Lanczos3);
+        let mut image_buffer = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut image_buffer), image::ImageFormat::Png)
             .unwrap();
 
-        Some(image)
+        Some(image_buffer)
     }
 }
 
@@ -186,5 +194,26 @@ pub async fn setup_ongen() {
 
     write_settings(&settings).await;
 
-    ONGEN.get_or_init(|| Arc::new(RwLock::new(ongens)));
+    if ONGEN.get().is_some() {
+        let mut ongen_lock = ONGEN.get().unwrap().write().await;
+        *ongen_lock = ongens;
+    } else {
+        ONGEN.set(Arc::new(RwLock::new(ongens))).unwrap();
+    }
+}
+
+pub async fn get_ongen_style_from_id<'a, 'b>(
+    ongens: &'a HashMap<Uuid, Ongen>,
+    settings: &'b crate::settings::Settings,
+    ongen_id: u32,
+) -> Option<(&'a Ongen, &'b StyleSettings)> {
+    let ongen = ongens
+        .values()
+        .find(|ongen| ongen.id() == ongen_id & !(0xff))?;
+    let ongen_settings = settings.ongen_settings.get(&ongen.uuid)?;
+
+    let style_index = ongen_id & 0xff;
+    let style_settings = ongen_settings.style_settings.get(style_index as usize)?;
+
+    Some((ongen, style_settings))
 }

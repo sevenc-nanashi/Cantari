@@ -15,6 +15,8 @@ export type StyleSettings = {
   portrait: string | null;
   icon: string | null;
 
+  key_shift: number;
+
   whisper: boolean;
   formant_shift: number;
   breathiness: number;
