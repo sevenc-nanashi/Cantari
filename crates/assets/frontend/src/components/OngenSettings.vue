@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Ongen, OngenSettings, useSettings } from "../composables/useData";
-import { toBase64, toBytes } from "fast-base64";
+import { Ongen, OngenSettings } from "../composables/useData";
+import { toBase64 } from "fast-base64";
 
-const settings = useSettings();
 const props = defineProps<{ ongens: Record<string, Ongen> }>();
 const ongenSettings = defineModel<Record<string, OngenSettings>>(
   "ongenSettings",
