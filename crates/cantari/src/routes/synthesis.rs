@@ -22,6 +22,16 @@ use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
 static CACHES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static PHRASE_PADDING: f64 = 0.1;
+static OTO_FALLBACKS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    map.insert("お", "を");
+    map.insert("ず", "づ");
+    map.insert("じ", "ぢ");
+    map.insert("づ", "ず");
+    map.insert("ぢ", "じ");
+    map
+});
 
 #[derive(Debug, Deserialize)]
 pub struct AudioQueryQuery {
@@ -64,13 +74,24 @@ struct SynthesisResult {
     sum_length: f64,
 }
 
-#[async_recursion]
 async fn get_oto<'a>(
     oto: &'a HashMap<String, Oto>,
     kana: &str,
     prefix: &str,
     suffix: &str,
     prev_vowel: &str,
+) -> Option<(&'a Oto, OtoData)> {
+    get_oto_inner(oto, kana, prefix, suffix, prev_vowel, true).await
+}
+
+#[async_recursion]
+async fn get_oto_inner<'a>(
+    oto: &'a HashMap<String, Oto>,
+    kana: &str,
+    prefix: &str,
+    suffix: &str,
+    prev_vowel: &str,
+    find_fallback: bool,
 ) -> Option<(&'a Oto, OtoData)> {
     let aliases = [
         // // 連続音（音質が安定しないので無効化）
@@ -90,9 +111,14 @@ async fn get_oto<'a>(
         }
     }
 
-    // 「お」を「を」と登録してる場合があるので、それを考慮
-    if kana == "お" {
-        return get_oto(oto, "を", prefix, suffix, prev_vowel).await;
+    if find_fallback {
+        if let Some(fallback) = OTO_FALLBACKS.get(kana) {
+            info!(
+                "No oto found for {:?} {:?} {:?} {:?}, trying fallback {:?}",
+                prefix, prev_vowel, kana, suffix, fallback
+            );
+            return get_oto_inner(oto, fallback, prefix, suffix, prev_vowel, false).await;
+        }
     }
 
     None
@@ -149,7 +175,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let oto: Option<(&Oto, OtoData)> =
             get_oto(&source.ongen.oto, &kana, prefix, suffix, &prev_vowel).await;
 
-        let start = sum_length;
+        let start = sum_length + PHRASE_PADDING;
         sum_length += length;
         let Some((oto, oto_data)) = oto else {
             if kana == "R" {
@@ -167,28 +193,32 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             continue;
         };
 
-        // let (next_oto, next_mora) = if i < moras.len() - 1 {
-        //     let next_mora = &moras[i + 1];
-        //     (
-        //         get_oto(
-        //             &source.ongen.oto,
-        //             &text_to_oto(&next_mora.text),
-        //             prefix,
-        //             suffix,
-        //             &mora.vowel.to_lowercase(),
-        //         )
-        //         .await,
-        //         Some(next_mora),
-        //     )
-        // } else {
-        //     (None, None)
-        // };
-        let start = start - (oto.overlap) / 1000.0;
-        let skip = if start < 0.0 { -start } else { 0.0 };
-        let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
-        aliases.push(oto.alias.clone());
+        let (next_oto, next_mora) = if i < moras.len() - 1 {
+            let next_mora = &moras[i + 1];
+            (
+                get_oto(
+                    &source.ongen.oto,
+                    &text_to_oto(&next_mora.text),
+                    prefix,
+                    suffix,
+                    &mora.vowel.to_lowercase(),
+                )
+                .await,
+                Some(next_mora),
+            )
+        } else {
+            (None, None)
+        };
 
-        let adjusted_length = length * 1000.0 + 35.0;
+        let fade_in = oto.overlap.max(35.0);
+        let fade_out = if let Some((next_oto, _)) = next_oto {
+            next_oto.overlap
+        } else {
+            0.0
+        }
+        .max(35.0);
+
+        let adjusted_length = length * 1000.0 + fade_out;
 
         let con_vel = if let Some(consonant_length) = mora.consonant_length {
             let oto_consonant_length = (oto.consonant - oto.preutter) / 1000.0;
@@ -197,6 +227,11 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         } else {
             100.0
         };
+        let skip = (if start < 0.0 { -start * 1000.0 } else { 0.0 } + (oto.preutter - oto.overlap)
+            - (oto.consonant - oto.preutter) / (con_vel / 100.0))
+            .max(0.0);
+        let start = if start < 0.0 { 0.0 } else { start * 1000.0 };
+        aliases.push(oto.alias.clone());
 
         let request = SynthRequest {
             sample_fs: oto_data.header.sample_rate as i32,
@@ -205,7 +240,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             tone: freq_midi.0 as i32,
             con_vel,
             offset: oto.offset,
-            required_length: adjusted_length + 100.0,
+            required_length: adjusted_length + skip + 100.0,
             consonant: oto.consonant,
             cut_off: oto.cut_off,
             volume: (100f32 * source.volume_scale) as f64,
@@ -220,7 +255,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             flag_mv: source.voicing as _,
         };
 
-        synthesizer.add_request(&request, start, skip, adjusted_length, 5.0, 35.0);
+        synthesizer.add_request(&request, start, skip, adjusted_length, fade_in, fade_out);
 
         f0.extend(vec![freq; (length * 1000.0 / MS_PER_FRAME) as usize]);
 
@@ -340,20 +375,25 @@ pub async fn post_synthesis(
 
     for phrase_wave in phrase_waves {
         let start = ((phrase_wave.start_seconds
-            + (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64)
-            * worldline::SAMPLE_RATE as f64) as usize;
-        let end = start + phrase_wave.data.len();
-        if end > wav.len() {
+            + (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64
+            - PHRASE_PADDING)
+            * worldline::SAMPLE_RATE as f64) as i64;
+        let end = start + phrase_wave.data.len() as i64;
+        if end > (wav.len() as i64) {
             warn!(
                 "Wave length exceeds allocated buffer: {} > {}",
                 end,
                 wav.len()
             );
-            wav.resize(end, 0.0);
+            wav.resize(end as usize, 0.0);
         }
 
         for (i, &sample) in phrase_wave.data.iter().enumerate() {
-            wav[start + i] += sample;
+            let item_index = start + i as i64;
+            if item_index < 0 {
+                continue;
+            }
+            wav[item_index as usize] += sample;
         }
     }
 
