@@ -103,13 +103,12 @@ fn modify_speed(
     for accent_phrase in &mut audio_query.accent_phrases {
         let mora_len = accent_phrase.moras.len();
         for (i, mora) in &mut accent_phrase.moras.iter_mut().enumerate() {
-            if mora.consonant.is_some() {
-                let vowel_length = mora.vowel_length;
-
-                mora.vowel_length = vowel_length * 0.7;
-            }
-            if i == mora_len - 1 {
-                mora.vowel_length = mora.vowel_length * 1.3;
+            if mora
+                .consonant
+                .as_ref()
+                .map_or(false, |c| ["sh", "z"].contains(&c.as_str()))
+            {
+                mora.consonant_length = Some(mora.consonant_length.unwrap_or(0.0) * 0.75);
             }
         }
     }

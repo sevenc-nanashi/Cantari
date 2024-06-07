@@ -72,12 +72,6 @@ impl PhraseSource<'_> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SynthesisResult {
-    wav: Vec<f32>,
-    sum_length: f64,
-}
-
 async fn get_oto<'a>(
     oto: &'a HashMap<String, Oto>,
     kana: &str,
@@ -171,47 +165,64 @@ impl AdjustedParam {
     }
 }
 
-async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
+pub async fn post_synthesis(
+    Query(query): Query<AudioQueryQuery>,
+    Json(audio_query): Json<HttpAudioQuery>,
+) -> Result<Vec<u8>> {
+    let ongens = ONGEN.get().unwrap().read().await;
+    let settings = load_settings().await;
+    let audio_query = AudioQueryModel::from(&audio_query)
+        .apply_speed_scale(audio_query.speed_scale)
+        .apply_pitch_scale(audio_query.pitch_scale)
+        .apply_intonation_scale(audio_query.intonation_scale);
+
+    let (ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, query.speaker)
+        .await
+        .ok_or_else(|| crate::error::Error::CharacterNotFound)?;
+
     let mut synthesizer = worldline::PhraseSynth::new();
 
-    let mut prev_vowel = source
-        .prev_mora
-        .map_or("-".to_string(), |mora| mora.vowel.to_lowercase());
+    let mut prev_vowel = "-".to_string();
 
     let mut f0 = Vec::new();
 
-    let mut moras = source.accent_phrase.moras.clone();
-    if let Some(pause_mora) = source.accent_phrase.pause_mora.clone() {
-        moras.push(pause_mora);
-    }
-
-    let next_mora_or_empty = match source.next_mora {
-        Some(next_mora) => vec![next_mora],
-        None => vec![],
-    };
+    let moras = audio_query
+        .accent_phrases
+        .iter()
+        .flat_map(|x| {
+            let mut moras = x.moras.iter().collect::<Vec<&MoraModel>>();
+            if let Some(pause_mora) = x.pause_mora.as_ref() {
+                moras.push(pause_mora);
+            }
+            moras
+        })
+        .collect::<Vec<&MoraModel>>();
 
     let mut otos: Vec<Prerender> = vec![];
-    for mora in moras.iter().chain(next_mora_or_empty.into_iter()) {
+    for mora in moras.iter() {
         let pitch = if mora.pitch == 0.0 {
             5.5f32
         } else {
             mora.pitch
         };
-        let freq = if source.whisper { pitch } else { pitch.exp() };
+        let freq = if style_settings.whisper {
+            pitch
+        } else {
+            pitch.exp()
+        };
         let kana = text_to_oto(&mora.text);
         let freq_midi = MidiNote::from_frequency(freq);
         let freq_midi_number = freq_midi.0 as i32;
-        let freq_midi_number = (freq_midi_number + source.key_shift as i32).clamp(
+        let freq_midi_number = (freq_midi_number + style_settings.key_shift as i32).clamp(
             MidiNote::from_str("C1").unwrap().0 as i32,
             MidiNote::from_str("B7").unwrap().0 as i32,
         ) as u8;
         let freq_midi = MidiNote(freq_midi_number);
-        let (prefix, suffix) = source
-            .ongen
+        let (prefix, suffix) = ongen
             .prefix_suffix_map
             .get(freq_midi.to_string().as_str())
             .map_or(("", ""), |x| (&x.0, &x.1));
-        match get_oto(&source.ongen.oto, &kana, prefix, suffix, &prev_vowel).await {
+        match get_oto(&ongen.oto, &kana, prefix, suffix, &prev_vowel).await {
             Some((alias, oto, oto_data)) => {
                 prev_vowel = mora.vowel.to_lowercase();
                 otos.push(Prerender {
@@ -235,15 +246,12 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         .map(|prerender| prerender.alias.clone())
         .collect::<Vec<String>>();
 
-    if aliases.is_empty() {
-        warn!("No aliases found for {:?}", source.accent_phrase);
-        SynthesisResult {
-            wav: vec![],
-            sum_length: 0.0,
-        }
+    let mut sum_length = 0.0;
+    let wav = if aliases.is_empty() {
+        warn!("No aliases found");
+        vec![]
     } else {
         info!("Calculating {:?}", aliases);
-        let mut sum_length = 0.0;
         let con_vels: Vec<f64> = otos
             .iter()
             .map(|current| {
@@ -270,15 +278,11 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             .enumerate()
             .map(|(i, (current, con_vel))| {
                 let prev_mora = if i == 0 {
-                    if let Some(prev_mora) = source.prev_mora {
-                        prev_mora
-                    } else {
-                        return AdjustedParam {
-                            preutter: current.oto.preutter,
-                            overlap: 0.0,
-                            skip: 0.0,
-                        };
-                    }
+                    return AdjustedParam {
+                        preutter: current.oto.preutter,
+                        overlap: 0.0,
+                        skip: 0.0,
+                    };
                 } else {
                     &moras[i - 1]
                 };
@@ -316,10 +320,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             let span = tracing::debug_span!("mora", oto = %current.alias);
             let _guard = span.enter();
 
-            if source.next_mora.is_some() && i == otos.len() - 1 {
-                debug!("Next phrase's mora, breaking loop");
-                break;
-            }
             debug!("Adjusted params: {:?}", &adjusted_param);
             debug!(
                 "Consonant velocity: {:?} (x{:?})",
@@ -344,6 +344,30 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
                         next_adjusted_params.overlap - next_adjusted_params.preutter
                     });
 
+            let mut next_fade = if i < otos.len() - 1 {
+                let next_adjusted_params = &adjusted_params[i + 1];
+                next_adjusted_params.fade()
+            } else {
+                0.0
+            };
+
+            let mut fade = adjusted_param.fade();
+
+            let volume = if fade + next_fade > adjusted_length {
+                warn!(
+                    "Fade length exceeds adjusted length: {:?} + {:?} > {:?}",
+                    fade, next_fade, adjusted_length
+                );
+
+                let volume = ((adjusted_length - next_fade) / fade).clamp(0.0, 1.0);
+                fade = (adjusted_length - next_fade).max(0.0);
+                next_fade = (adjusted_length - fade).max(0.0);
+
+                volume
+            } else {
+                1.0
+            };
+
             let request = SynthRequest {
                 sample_fs: current.oto_data.header.sample_rate as i32,
                 sample: current.oto_data.samples.clone(),
@@ -354,26 +378,17 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
                 required_length: adjusted_length + skip + 100.0,
                 consonant: current.oto.consonant - skip,
                 cut_off: current.oto.cut_off - skip * current.oto.cut_off.signum(),
-                volume: (100f32 * source.volume_scale) as f64,
+                volume: (100f64 * volume) * (audio_query.volume_scale as f64),
                 modulation: 0.0,
                 tempo: 0.0,
                 pitch_bend: vec![0],
-                flag_g: source.formant_shift as _,
+                flag_g: style_settings.formant_shift as _,
                 flag_o: 0,
-                flag_p: source.peak_compression as _,
-                flag_mt: source.tension as _,
-                flag_mb: source.breathiness as _,
-                flag_mv: source.voicing as _,
+                flag_p: style_settings.peak_compression as _,
+                flag_mt: style_settings.tension as _,
+                flag_mb: style_settings.breathiness as _,
+                flag_mv: style_settings.voicing as _,
             };
-
-            let next_fade = if i < otos.len() - 1 {
-                let next_adjusted_params = &adjusted_params[i + 1];
-                next_adjusted_params.fade()
-            } else {
-                0.0
-            };
-
-            let fade = adjusted_param.fade();
 
             debug!(
                 "Request: alias: {:?}, start: {:?}, skip: {:?}, length: {:?} -> {:?}, fade: {:?}, next fade: {:?}",
@@ -382,27 +397,12 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             synthesizer.add_request(&request, start, skip, adjusted_length, fade, next_fade);
 
             if i == 0 {
-                let freq = match source.prev_mora {
-                    Some(prev_mora) => {
-                        let pitch = if prev_mora.pitch == 0.0 {
-                            5.5f32
-                        } else {
-                            prev_mora.pitch
-                        };
-                        if source.whisper {
-                            pitch
-                        } else {
-                            pitch.exp()
-                        }
-                    }
-                    None => current.freq,
-                };
-                f0.extend(vec![freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
+                f0.extend(vec![current.freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
             }
 
             f0.extend(vec![current.freq; (length / MS_PER_FRAME) as usize]);
 
-            if i + 1 == source.accent_phrase.moras.len() {
+            if i == otos.len() - 1 {
                 f0.extend(vec![current.freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
             }
 
@@ -423,134 +423,25 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             // &vec![source.breathiness as f64; smooth_f0.len()],
             // &vec![source.voicing as f64; smooth_f0.len()],
         );
-        let wav = synthesizer.synth_async().await;
 
-        SynthesisResult { wav, sum_length }
-    }
-}
-
-pub async fn post_synthesis(
-    Query(query): Query<AudioQueryQuery>,
-    Json(audio_query): Json<HttpAudioQuery>,
-) -> Result<Vec<u8>> {
-    let ongens = ONGEN.get().unwrap().read().await;
-    let settings = load_settings().await;
-    let audio_query = AudioQueryModel::from(&audio_query)
-        .apply_speed_scale(audio_query.speed_scale)
-        .apply_pitch_scale(audio_query.pitch_scale)
-        .apply_intonation_scale(audio_query.intonation_scale);
-
-    let (ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, query.speaker)
-        .await
-        .ok_or_else(|| crate::error::Error::CharacterNotFound)?;
-
-    let results = futures::future::join_all(audio_query.accent_phrases.iter().enumerate().map(
-        |(i, accent_phrase)| {
-            let next_mora = audio_query
-                .accent_phrases
-                .get(i + 1)
-                .as_ref()
-                .map(|p| &p.moras[0]);
-            let prev_mora = if i == 0 {
-                None
-            } else {
-                Some(audio_query.accent_phrases[i - 1].moras.last().unwrap())
-            };
-            async move {
-                // let prev_freq =
-                //     if i == 0 {
-                //     440.0f32
-                // } else {
-                //     accent_phrases[i - 1].moras.last().unwrap().pitch.exp()
-                // };
-                let phrase_source = PhraseSource {
-                    accent_phrase,
-                    next_mora,
-                    prev_mora,
-                    ongen,
-                    speaker: query.speaker,
-                    volume_scale: audio_query.volume_scale,
-
-                    key_shift: style_settings.key_shift,
-                    whisper: style_settings.whisper,
-                    formant_shift: style_settings.formant_shift,
-                    breathiness: style_settings.breathiness,
-                    tension: style_settings.tension,
-                    peak_compression: style_settings.peak_compression,
-                    voicing: style_settings.voicing,
-                };
-                let hash = phrase_source.hash();
-                let cache_hit = {
-                    let caches = CACHES.read().await;
-                    caches.contains(&hash)
-                };
-                let cache_path = TEMPDIR.join(format!("cache-{}.msgpack", hash));
-                let result = if cache_hit {
-                    info!("Cache hit for {}", hash);
-                    let data = fs_err::tokio::read(cache_path).await.unwrap();
-                    rmp_serde::from_read(data.as_slice()).unwrap()
-                } else {
-                    info!("Cache miss for {}", hash);
-                    let result = synthesis_phrase(&phrase_source).await;
-                    if let Err(e) =
-                        fs_err::tokio::write(cache_path, rmp_serde::to_vec(&result).unwrap()).await
-                    {
-                        error!("Failed to write cache: {}", e);
-                    };
-                    let mut caches = CACHES.write().await;
-                    caches.insert(hash);
-                    result
-                };
-
-                result
-            }
-        },
-    ))
-    .await;
-    let mut total_sum_length = 0.0;
-    let mut phrase_waves: Vec<PhraseWaves> = vec![];
-    for result in results {
-        phrase_waves.push(PhraseWaves {
-            data: result.wav,
-            start_seconds: total_sum_length,
-        });
-
-        total_sum_length += result.sum_length / 1000.0;
-    }
+        synthesizer.synth_async().await
+    };
 
     let pre_phoneme_length = (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64;
     let post_phoneme_length = (audio_query.post_phoneme_length / audio_query.speed_scale) as f64;
 
-    let duration = total_sum_length + pre_phoneme_length + post_phoneme_length;
+    let duration = pre_phoneme_length + sum_length + post_phoneme_length;
 
-    let mut wav = vec![0.0; (duration * worldline::SAMPLE_RATE as f64) as usize];
+    let mut padded_wav = vec![0.0; (duration * worldline::SAMPLE_RATE as f64) as usize];
 
-    for phrase_wave in phrase_waves {
-        let start = ((phrase_wave.start_seconds + pre_phoneme_length - (PHRASE_PADDING / 1000.0))
-            * worldline::SAMPLE_RATE as f64) as i64;
-        let end = start + phrase_wave.data.len() as i64;
-        debug!(
-            "Phrase: {} -> {} -> {}",
-            start,
-            start + ((PHRASE_PADDING / 1000.0) * worldline::SAMPLE_RATE as f64) as i64,
-            end
-        );
-        if end > (wav.len() as i64) {
-            warn!(
-                "Wave length exceeds allocated buffer: {} > {}",
-                end,
-                wav.len()
-            );
-            wav.resize(end as usize, 0.0);
+    let start = (pre_phoneme_length * worldline::SAMPLE_RATE as f64) as i64
+        - (PHRASE_PADDING / 1000.0 * worldline::SAMPLE_RATE as f64) as i64;
+    for (i, &sample) in wav.iter().enumerate() {
+        let index = start + i as i64;
+        if index < 0 || index >= padded_wav.len() as i64 {
+            continue;
         }
-
-        for (i, &sample) in phrase_wave.data.iter().enumerate() {
-            let item_index = start + i as i64;
-            if item_index < 0 {
-                continue;
-            }
-            wav[item_index as usize] += sample;
-        }
+        padded_wav[index as usize] = sample;
     }
 
     let sample_rate = audio_query
