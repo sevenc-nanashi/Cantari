@@ -1,6 +1,6 @@
 use super::audio_query::HttpAudioQuery;
 use crate::{
-    error::{Error, Result},
+    error::Result,
     math::{smooth, MidiNote},
     model::{AccentPhraseModel, AudioQueryModel, MoraModel},
     ongen::{get_ongen_style_from_id, ONGEN},
@@ -8,7 +8,6 @@ use crate::{
     settings::load_settings,
     tempdir::TEMPDIR,
 };
-use anyhow::anyhow;
 use async_recursion::async_recursion;
 use axum::{extract::Query, Json};
 use itertools::izip;
@@ -178,7 +177,6 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
     let mut prev_vowel = source
         .prev_mora
         .map_or("-".to_string(), |mora| mora.vowel.to_lowercase());
-    let mut sum_length = 0.0;
 
     let mut f0 = Vec::new();
 
