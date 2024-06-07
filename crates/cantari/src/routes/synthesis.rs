@@ -25,7 +25,6 @@ use worldline::{SynthRequest, MS_PER_FRAME};
 
 static CACHES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 static PHRASE_PADDING: f64 = 500.0;
-static MINIMUM_OVERLAP: f64 = 10.0;
 
 static OTO_FALLBACKS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     let mut map = HashMap::new();
@@ -250,21 +249,20 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
         let con_vels: Vec<f64> = otos
             .iter()
             .map(|current| {
-                // if let Some(consonant_length) = current.mora.consonant_length {
-                //     let consonant_length = (consonant_length * 1000.0) as f64;
-                //     let oto_consonant_length = (current.oto.preutter - current.oto.overlap)
-                //         + (current.oto.consonant - current.oto.preutter) / 2.0;
-                //     let vel = factor_to_con_vel((consonant_length) / oto_consonant_length)
-                //         .clamp(0.0, 200.0);
-                //     if vel.is_nan() {
-                //         100.0
-                //     } else {
-                //         vel
-                //     }
-                // } else {
-                //     100.0
-                // }
-                100.0
+                if let Some(consonant_length) = current.mora.consonant_length {
+                    let consonant_length = (consonant_length * 1000.0) as f64;
+                    let oto_consonant_length = (current.oto.preutter - current.oto.overlap)
+                        + (current.oto.consonant - current.oto.preutter) / 2.0;
+                    let vel = factor_to_con_vel((consonant_length) / oto_consonant_length)
+                        .clamp(0.0, 200.0);
+                    if vel.is_nan() {
+                        100.0
+                    } else {
+                        vel
+                    }
+                } else {
+                    100.0
+                }
             })
             .collect();
 
