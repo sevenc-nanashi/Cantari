@@ -25,7 +25,7 @@ enum OtoCache {
 pub struct Oto {
     pub path: PathBuf,
     pub frq: PathBuf,
-    pub alias: String,
+    pub names: Vec<String>,
     pub offset: f64,
     pub consonant: f64,
     pub cut_off: f64,
@@ -48,16 +48,18 @@ impl Oto {
             }
         };
         let frq_name = captures["name"].replace(".wav", "_wav.frq");
-        let mut alias = captures["alias"].to_string();
+        let wav_name = captures["name"].strip_suffix(".wav").ok_or_else(|| anyhow!("Failed to strip suffix"))?;
+        let alias = captures["alias"].to_string();
+        let mut names = vec![wav_name.to_string(), alias.clone()];
         if alias.is_empty() {
-            alias = captures["name"].to_string().replace(".wav", "");
+            names.remove(1);
         }
         let path = root.join(&captures["name"]);
         let frq = root.join(frq_name);
         Ok(Self {
             path,
             frq,
-            alias,
+            names,
             offset: captures["offset"].parse()?,
             consonant: captures["consonant"].parse()?,
             cut_off: captures["cut_off"].parse()?,
@@ -73,24 +75,15 @@ impl Oto {
         for line in oto_ini.lines() {
             let oto = Oto::new(line, root.clone()).await;
             if let Ok(oto) = oto {
-                otos.insert(oto.alias.clone(), oto);
+                for name in &oto.names {
+                    otos.insert(name.clone(), oto.clone());
+                }
             } else {
                 warn!("Failed to parse oto line: {}", line);
             }
         }
 
         otos
-    }
-
-    pub fn is_vcv(&self) -> bool {
-        self.alias.contains(' ') && !self.alias.starts_with("- ")
-    }
-
-    pub fn is_cvvc(&self) -> bool {
-        return self.is_vcv()
-            && ["あ", "い", "う", "え", "お"]
-                .iter()
-                .any(|x| self.alias.contains(x));
     }
 
     pub async fn read(&self) -> Result<OtoData> {
