@@ -99,7 +99,20 @@ fn modify_speed(
         kana: None,
     };
 
-    let audio_query = audio_query.apply_speed_scale(SPEED_SCALE);
+    let mut audio_query = audio_query.apply_speed_scale(SPEED_SCALE);
+    for accent_phrase in &mut audio_query.accent_phrases {
+        let mora_len = accent_phrase.moras.len();
+        for (i, mora) in &mut accent_phrase.moras.iter_mut().enumerate() {
+            if mora.consonant.is_some() {
+                let vowel_length = mora.vowel_length;
+
+                mora.vowel_length = vowel_length * 0.7;
+            }
+            if i == mora_len - 1 {
+                mora.vowel_length = mora.vowel_length * 1.3;
+            }
+        }
+    }
 
     audio_query.accent_phrases
 }
@@ -137,7 +150,7 @@ async fn modify_pitch(
             if mora.pitch == 0.0f32 {
                 continue;
             }
-            mora.pitch += (style_settings.formant_shift as f32 / 50.0f32);
+            mora.pitch += style_settings.formant_shift as f32 / 50.0f32;
         }
     }
 

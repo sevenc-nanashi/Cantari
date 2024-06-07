@@ -155,13 +155,13 @@ struct Prerender<'a> {
 }
 
 #[derive(Debug)]
-struct AdjustedParams {
+struct AdjustedParam {
     preutter: f64,
     overlap: f64,
     skip: f64,
 }
 
-impl AdjustedParams {
+impl AdjustedParam {
     fn fade(&self) -> f64 {
         self.overlap.max(0.0)
     }
@@ -249,10 +249,10 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             .map(|current| {
                 if let Some(consonant_length) = current.mora.consonant_length {
                     let consonant_length = (consonant_length * 1000.0) as f64;
-                    let oto_consonant_length = (current.oto.preutter - current.oto.overlap)
+                    let oto_consonant_length = (current.oto.preutter - current.oto.overlap) / 2.0
                         + (current.oto.consonant - current.oto.preutter) / 2.0;
                     let vel = factor_to_con_vel((consonant_length) / oto_consonant_length)
-                        .clamp(0.0, 200.0);
+                        .clamp(100.0, 275.0);
                     if vel.is_nan() {
                         100.0
                     } else {
@@ -264,7 +264,7 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             })
             .collect();
 
-        let adjusted_params: Vec<AdjustedParams> = otos
+        let adjusted_params: Vec<AdjustedParam> = otos
             .iter()
             .zip(con_vels.iter())
             .enumerate()
@@ -273,9 +273,9 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
                     if let Some(prev_mora) = source.prev_mora {
                         prev_mora
                     } else {
-                        return AdjustedParams {
+                        return AdjustedParam {
                             preutter: current.oto.preutter,
-                            overlap: current.oto.overlap,
+                            overlap: 0.0,
                             skip: 0.0,
                         };
                     }
@@ -292,13 +292,13 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
                     let at_preutter = real_preutter / (real_preutter - real_overlap) * prev_length;
                     let at_overlap = real_overlap / (real_preutter - real_overlap) * prev_length;
                     let at_skip = real_preutter - at_preutter;
-                    AdjustedParams {
+                    AdjustedParam {
                         preutter: at_preutter,
                         overlap: at_overlap,
                         skip: at_skip,
                     }
                 } else {
-                    AdjustedParams {
+                    AdjustedParam {
                         preutter: real_preutter,
                         overlap: real_overlap,
                         skip: 0.0,
@@ -307,9 +307,15 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             })
             .collect();
 
+        debug!("Consonant velocities: {:?}", &con_vels);
+        debug!("Adjusted params: {:?}", &adjusted_params);
+
         for (i, (current, con_vel, adjusted_param)) in
             izip!(otos.iter(), con_vels.iter(), adjusted_params.iter()).enumerate()
         {
+            let span = tracing::debug_span!("mora", oto = %current.alias);
+            let _guard = span.enter();
+
             if source.next_mora.is_some() && i == otos.len() - 1 {
                 debug!("Next phrase's mora, breaking loop");
                 break;
@@ -332,12 +338,11 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
 
             let adjusted_length = length
                 + adjusted_param.preutter
-                + if i < otos.len() - 1 {
-                    let next_adjusted_params = &adjusted_params[i + 1];
-                    next_adjusted_params.overlap - next_adjusted_params.preutter
-                } else {
-                    0.0
-                };
+                + adjusted_params
+                    .get(i + 1)
+                    .map_or(0.0, |next_adjusted_params| {
+                        next_adjusted_params.overlap - next_adjusted_params.preutter
+                    });
 
             let request = SynthRequest {
                 sample_fs: current.oto_data.header.sample_rate as i32,
@@ -377,12 +382,27 @@ async fn synthesis_phrase(source: &PhraseSource<'_>) -> SynthesisResult {
             synthesizer.add_request(&request, start, skip, adjusted_length, fade, next_fade);
 
             if i == 0 {
-                f0.extend(vec![current.freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
+                let freq = match source.prev_mora {
+                    Some(prev_mora) => {
+                        let pitch = if prev_mora.pitch == 0.0 {
+                            5.5f32
+                        } else {
+                            prev_mora.pitch
+                        };
+                        if source.whisper {
+                            pitch
+                        } else {
+                            pitch.exp()
+                        }
+                    }
+                    None => current.freq,
+                };
+                f0.extend(vec![freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
             }
 
             f0.extend(vec![current.freq; (length / MS_PER_FRAME) as usize]);
 
-            if i + 1 == otos.len() {
+            if i + 1 == source.accent_phrase.moras.len() {
                 f0.extend(vec![current.freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
             }
 
@@ -497,17 +517,24 @@ pub async fn post_synthesis(
 
         total_sum_length += result.sum_length / 1000.0;
     }
-    let duration = total_sum_length
-        + ((audio_query.pre_phoneme_length + audio_query.post_phoneme_length)
-            / audio_query.speed_scale) as f64;
+
+    let pre_phoneme_length = (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64;
+    let post_phoneme_length = (audio_query.post_phoneme_length / audio_query.speed_scale) as f64;
+
+    let duration = total_sum_length + pre_phoneme_length + post_phoneme_length;
+
     let mut wav = vec![0.0; (duration * worldline::SAMPLE_RATE as f64) as usize];
 
     for phrase_wave in phrase_waves {
-        let start = ((phrase_wave.start_seconds
-            + (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64
-            - PHRASE_PADDING / 1000.0)
+        let start = ((phrase_wave.start_seconds + pre_phoneme_length - (PHRASE_PADDING / 1000.0))
             * worldline::SAMPLE_RATE as f64) as i64;
         let end = start + phrase_wave.data.len() as i64;
+        debug!(
+            "Phrase: {} -> {} -> {}",
+            start,
+            start + ((PHRASE_PADDING / 1000.0) * worldline::SAMPLE_RATE as f64) as i64,
+            end
+        );
         if end > (wav.len() as i64) {
             warn!(
                 "Wave length exceeds allocated buffer: {} > {}",
