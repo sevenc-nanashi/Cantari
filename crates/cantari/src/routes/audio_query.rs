@@ -99,19 +99,7 @@ fn modify_speed(
         kana: None,
     };
 
-    let mut audio_query = audio_query.apply_speed_scale(SPEED_SCALE);
-    for accent_phrase in &mut audio_query.accent_phrases {
-        let mora_len = accent_phrase.moras.len();
-        for (i, mora) in &mut accent_phrase.moras.iter_mut().enumerate() {
-            if mora
-                .consonant
-                .as_ref()
-                .map_or(false, |c| ["sh", "z"].contains(&c.as_str()))
-            {
-                mora.consonant_length = Some(mora.consonant_length.unwrap_or(0.0) * 0.75);
-            }
-        }
-    }
+    let audio_query = audio_query.apply_speed_scale(SPEED_SCALE);
 
     audio_query.accent_phrases
 }

@@ -155,6 +155,14 @@ struct AdjustedParam {
     skip: f64,
 }
 
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+enum SynthThreadMessage {
+    Request(String, SynthRequest, f64, f64, f64, f64, f64),
+    F0(Vec<f32>),
+    Do,
+}
+
 impl AdjustedParam {
     fn fade(&self) -> f64 {
         self.overlap.max(0.0)
@@ -314,6 +322,45 @@ pub async fn post_synthesis(
         debug!("Consonant velocities: {:?}", &con_vels);
         debug!("Adjusted params: {:?}", &adjusted_params);
 
+        let (message_sender, message_receiver) = std::sync::mpsc::channel::<SynthThreadMessage>();
+
+        let wav_task = tokio::task::spawn_blocking(move || {
+            for message in message_receiver.iter() {
+                match message {
+                    SynthThreadMessage::Request(
+                        alias,
+                        request,
+                        start,
+                        skip,
+                        length,
+                        fade,
+                        next_fade,
+                    ) => {
+                        debug!(
+                            "Adding request: {:?} {:?} {:?} {:?} {:?} {:?}",
+                            alias, start, skip, length, fade, next_fade
+                        );
+                        synthesizer.add_request(&request, start, skip, length, fade, next_fade);
+                    }
+                    SynthThreadMessage::F0(f0) => {
+                        debug!("Setting f0");
+                        synthesizer.set_curves(
+                            &f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
+                            &vec![0.5; f0.len()],
+                            &vec![0.5; f0.len()],
+                            &vec![0.5; f0.len()],
+                            &vec![0.5; f0.len()],
+                        );
+                    }
+                    SynthThreadMessage::Do => break,
+                }
+            }
+
+            info!("Synthesizing...");
+
+            synthesizer.synth()
+        });
+
         for (i, (current, con_vel, adjusted_param)) in
             izip!(otos.iter(), con_vels.iter(), adjusted_params.iter()).enumerate()
         {
@@ -351,7 +398,7 @@ pub async fn post_synthesis(
                 0.0
             };
 
-            let mut fade = adjusted_param.fade();
+            let mut fade = if i == 0 { 0.0 } else { adjusted_param.fade() };
 
             let volume = if fade + next_fade > adjusted_length {
                 warn!(
@@ -390,11 +437,17 @@ pub async fn post_synthesis(
                 flag_mv: style_settings.voicing as _,
             };
 
-            debug!(
-                "Request: alias: {:?}, start: {:?}, skip: {:?}, length: {:?} -> {:?}, fade: {:?}, next fade: {:?}",
-                &current.alias, start, skip, length, adjusted_length, fade, next_fade
-            );
-            synthesizer.add_request(&request, start, skip, adjusted_length, fade, next_fade);
+            message_sender
+                .send(SynthThreadMessage::Request(
+                    current.alias.clone(),
+                    request,
+                    start,
+                    skip,
+                    adjusted_length,
+                    fade,
+                    next_fade,
+                ))
+                .expect("Failed to send message");
 
             if i == 0 {
                 f0.extend(vec![current.freq; (PHRASE_PADDING / MS_PER_FRAME) as usize]);
@@ -412,19 +465,15 @@ pub async fn post_synthesis(
 
         let smooth_f0 = smooth(&f0, 10);
 
-        synthesizer.set_curves(
-            &smooth_f0.iter().map(|x| *x as f64).collect::<Vec<f64>>(),
-            &vec![0.5; smooth_f0.len()],
-            &vec![0.5; smooth_f0.len()],
-            &vec![0.5; smooth_f0.len()],
-            &vec![0.5; smooth_f0.len()],
-            // &vec![source.formant_shift as f64; smooth_f0.len()],
-            // &vec![source.tension as f64; smooth_f0.len()],
-            // &vec![source.breathiness as f64; smooth_f0.len()],
-            // &vec![source.voicing as f64; smooth_f0.len()],
-        );
+        message_sender
+            .send(SynthThreadMessage::F0(smooth_f0))
+            .expect("Failed to send message");
 
-        synthesizer.synth_async().await
+        message_sender
+            .send(SynthThreadMessage::Do)
+            .expect("Failed to send message");
+
+        wav_task.await.unwrap()
     };
 
     let pre_phoneme_length = (audio_query.pre_phoneme_length / audio_query.speed_scale) as f64;
