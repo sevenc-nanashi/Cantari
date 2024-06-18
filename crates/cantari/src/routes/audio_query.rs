@@ -137,7 +137,7 @@ async fn modify_pitch(
             if mora.pitch == 0.0f32 {
                 continue;
             }
-            mora.pitch += (style_settings.formant_shift as f32 / 50.0f32);
+            mora.pitch += style_settings.formant_shift as f32 / 50.0f32;
         }
     }
 

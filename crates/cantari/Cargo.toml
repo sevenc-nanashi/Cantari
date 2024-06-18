@@ -43,6 +43,7 @@ tempfile = "3.10.1"
 futures = "0.3.30"
 serde_with = { version = "3.8.1", features = ["base64"] }
 educe = { version = "0.6.0", features = ["Debug"] }
+itertools = "0.13.0"
 
 [dev-dependencies]
 cargo-license = "0.5.1"
