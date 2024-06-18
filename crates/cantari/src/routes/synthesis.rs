@@ -280,6 +280,10 @@ pub async fn post_synthesis(
             })
             .collect();
 
+        sum_length = otos.first().map_or(0.0, |x| {
+            ((x.mora.consonant_length.unwrap_or(0.0)) * 1000.0) as f64
+        });
+
         let adjusted_params: Vec<AdjustedParam> = otos
             .iter()
             .zip(con_vels.iter())
@@ -295,7 +299,7 @@ pub async fn post_synthesis(
                     &moras[i - 1]
                 };
                 let prev_length = ((prev_mora.vowel_length
-                    + prev_mora.consonant_length.unwrap_or(0.0))
+                    + current.mora.consonant_length.unwrap_or(0.0))
                     * 1000.0) as f64;
                 let real_preutter = current.oto.preutter * con_vel_to_factor(*con_vel);
                 let real_overlap = current.oto.overlap * con_vel_to_factor(*con_vel);
@@ -376,7 +380,9 @@ pub async fn post_synthesis(
             let start =
                 sum_length + PHRASE_PADDING + adjusted_param.shift() - adjusted_param.preutter;
             let length = ((current.mora.vowel_length
-                + current.mora.consonant_length.unwrap_or(0.0))
+                + otos
+                    .get(i + 1)
+                    .map_or(0.0, |next| next.mora.consonant_length.unwrap_or(0.0)))
                 * 1000.0) as f64;
             sum_length += length;
 
