@@ -2,27 +2,21 @@ use super::audio_query::HttpAudioQuery;
 use crate::{
     error::Result,
     math::{smooth, MidiNote},
-    model::{AccentPhraseModel, AudioQueryModel, MoraModel},
+    model::{AudioQueryModel, MoraModel},
     ongen::{get_ongen_style_from_id, ONGEN},
     oto::{Oto, OtoData},
     settings::load_settings,
-    tempdir::TEMPDIR,
 };
 use async_recursion::async_recursion;
 use axum::{extract::Query, Json};
 use itertools::izip;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-};
-use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use serde::Deserialize;
+use std::{collections::HashMap, str::FromStr};
+use tracing::{debug, info, warn};
 use wav_io::header::WavHeader;
 use worldline::{SynthRequest, MS_PER_FRAME};
 
-static CACHES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 static PHRASE_PADDING: f64 = 500.0;
 
 static OTO_FALLBACKS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
@@ -39,37 +33,6 @@ static OTO_FALLBACKS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
 #[derive(Debug, Deserialize)]
 pub struct AudioQueryQuery {
     pub speaker: u32,
-}
-
-#[derive(Debug)]
-struct PhraseWaves {
-    pub data: Vec<f32>,
-    pub start_seconds: f64,
-}
-
-#[derive(Debug, Serialize)]
-struct PhraseSource<'a> {
-    accent_phrase: &'a AccentPhraseModel,
-    prev_mora: Option<&'a MoraModel>,
-    next_mora: Option<&'a MoraModel>,
-    ongen: &'a crate::ongen::Ongen,
-    speaker: u32,
-    volume_scale: f32,
-
-    key_shift: i8,
-    whisper: bool,
-    formant_shift: i8,
-    breathiness: u8,
-    tension: i8,
-    peak_compression: u8,
-    voicing: u8,
-}
-
-impl PhraseSource<'_> {
-    fn hash(&self) -> String {
-        let json = serde_json::to_string(self).unwrap();
-        xxhash_rust::xxh3::xxh3_64(json.as_bytes()).to_string()
-    }
 }
 
 async fn get_oto<'a>(
@@ -131,19 +94,15 @@ fn factor_to_con_vel(factor: f64) -> f64 {
 }
 
 fn text_to_oto(text: &str) -> String {
-    if text == "、" {
-        "R".to_string()
-    } else {
-        kana::kata2hira(text)
-    }
+    kana::kata2hira(text)
 }
 
 #[derive(Debug)]
 struct Prerender<'a> {
     alias: String,
     freq: f32,
-    oto: &'a Oto,
-    oto_data: OtoData,
+    oto: Option<&'a Oto>,
+    oto_data: Option<OtoData>,
     mora: &'a MoraModel,
     note: MidiNote,
 }
@@ -236,15 +195,24 @@ pub async fn post_synthesis(
                 otos.push(Prerender {
                     freq,
                     alias,
-                    oto,
-                    oto_data,
+                    oto: Some(oto),
+                    oto_data: Some(oto_data),
                     mora,
                     note: freq_midi,
                 });
             }
             None => {
-                warn!("No oto found for {:?}", kana);
-                continue;
+                if kana != "、" {
+                    warn!("No oto found for {:?}", kana);
+                }
+                otos.push(Prerender {
+                    freq,
+                    alias: "".to_string(),
+                    oto: None,
+                    oto_data: None,
+                    mora,
+                    note: freq_midi,
+                });
             }
         }
     }
@@ -263,10 +231,13 @@ pub async fn post_synthesis(
         let con_vels: Vec<f64> = otos
             .iter()
             .map(|current| {
+                let Some(oto) = &current.oto else {
+                    return 100.0;
+                };
                 if let Some(consonant_length) = current.mora.consonant_length {
                     let consonant_length = (consonant_length * 1000.0) as f64;
-                    let oto_consonant_length = (current.oto.preutter - current.oto.overlap) / 2.0
-                        + (current.oto.consonant - current.oto.preutter) / 2.0;
+                    let oto_consonant_length =
+                        (oto.preutter - oto.overlap) / 2.0 + (oto.consonant - oto.preutter) / 2.0;
                     let vel = factor_to_con_vel((consonant_length) / oto_consonant_length)
                         .clamp(100.0, 275.0);
                     if vel.is_nan() {
@@ -289,9 +260,16 @@ pub async fn post_synthesis(
             .zip(con_vels.iter())
             .enumerate()
             .map(|(i, (current, con_vel))| {
+                let Some(oto) = &current.oto else {
+                    return AdjustedParam {
+                        preutter: 0.0,
+                        overlap: 0.0,
+                        skip: 0.0,
+                    };
+                };
                 let prev_mora = if i == 0 {
                     return AdjustedParam {
-                        preutter: current.oto.preutter,
+                        preutter: oto.preutter,
                         overlap: 0.0,
                         skip: 0.0,
                     };
@@ -301,8 +279,8 @@ pub async fn post_synthesis(
                 let prev_length = ((prev_mora.vowel_length
                     + current.mora.consonant_length.unwrap_or(0.0))
                     * 1000.0) as f64;
-                let real_preutter = current.oto.preutter * con_vel_to_factor(*con_vel);
-                let real_overlap = current.oto.overlap * con_vel_to_factor(*con_vel);
+                let real_preutter = oto.preutter * con_vel_to_factor(*con_vel);
+                let real_overlap = oto.overlap * con_vel_to_factor(*con_vel);
 
                 if prev_length / 2.0 < real_preutter - real_overlap {
                     let at_preutter = real_preutter / (real_preutter - real_overlap) * prev_length;
@@ -386,6 +364,11 @@ pub async fn post_synthesis(
                 * 1000.0) as f64;
             sum_length += length;
 
+            let Some(oto) = &current.oto else {
+                continue;
+            };
+            let oto_data = current.oto_data.as_ref().unwrap();
+
             let skip = adjusted_param.skip.max(0.0) - start.min(0.0);
             let start = start.max(0.0);
 
@@ -422,15 +405,15 @@ pub async fn post_synthesis(
             };
 
             let request = SynthRequest {
-                sample_fs: current.oto_data.header.sample_rate as i32,
-                sample: current.oto_data.samples.clone(),
-                frq: current.oto_data.frq.clone(),
+                sample_fs: oto_data.header.sample_rate as i32,
+                sample: oto_data.samples.clone(),
+                frq: oto_data.frq.clone(),
                 tone: current.note.0 as i32,
                 con_vel: *con_vel,
-                offset: current.oto.offset,
+                offset: oto.offset,
                 required_length: adjusted_length + skip + 100.0,
-                consonant: current.oto.consonant - skip,
-                cut_off: current.oto.cut_off - skip * current.oto.cut_off.signum(),
+                consonant: oto.consonant - skip,
+                cut_off: oto.cut_off - skip * oto.cut_off.signum(),
                 volume: (100f64 * volume) * (audio_query.volume_scale as f64),
                 modulation: 0.0,
                 tempo: 0.0,
