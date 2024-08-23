@@ -55,6 +55,7 @@ pub struct SupportedFeatures {
     pub interrogative_upspeak: bool,
     pub synthesis_morphing: bool,
     pub manage_library: bool,
+    pub return_resource_url: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -166,6 +167,7 @@ pub async fn get_engine_manifest() -> Json<EngineManifest> {
             interrogative_upspeak: false,
             synthesis_morphing: false,
             manage_library: false,
+            return_resource_url: true,
         },
     })
 }

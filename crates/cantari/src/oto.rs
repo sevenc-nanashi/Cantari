@@ -48,7 +48,9 @@ impl Oto {
             }
         };
         let frq_name = captures["name"].replace(".wav", "_wav.frq");
-        let wav_name = captures["name"].strip_suffix(".wav").ok_or_else(|| anyhow!("Failed to strip suffix"))?;
+        let wav_name = captures["name"]
+            .strip_suffix(".wav")
+            .ok_or_else(|| anyhow!("Failed to strip suffix"))?;
         let alias = captures["alias"].to_string();
         let mut names = vec![wav_name.to_string(), alias.clone()];
         if alias.is_empty() {

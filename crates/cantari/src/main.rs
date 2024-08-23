@@ -78,6 +78,14 @@ async fn main_impl(args: Cli) -> Result<()> {
             .route("/speakers", get(routes::speakers::get_speakers))
             .route("/speaker_info", get(routes::speakers::get_speaker_info))
             .route(
+                "/speaker_resources/icons/:uuid/:index",
+                get(routes::speakers::get_icon),
+            )
+            .route(
+                "/speaker_resources/portraits/:uuid/:index",
+                get(routes::speakers::get_portrait),
+            )
+            .route(
                 "/is_initialized_speaker",
                 get(routes::audio_query::get_is_initialized_speaker),
             )
