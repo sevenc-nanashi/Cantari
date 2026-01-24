@@ -101,7 +101,7 @@ jobs:
           cp -r target/release/{sample.vvm,*.html,dict} archive
           cp target/release/{*.dylib,*.so,*.so.*,*.dll} archive || true
           cp target/release/{cantari,cantari.exe} archive || true
-          cp crates/cantari/engine_manifest.json archive
+          cat ./crates/cantari/engine_manifest.json | jq --arg ver "${{ needs.info.outputs.version }}" '.version = $ver' > archive/engine_manifest.json
           cd archive
           zip -r ../cantari-${{ needs.info.outputs.version }}${{ matrix.suffix }}.zip .
           cd ..

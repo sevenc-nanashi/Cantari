@@ -1,5 +1,10 @@
 # アップデート履歴
 
+## 0.0.7
+
+- 連続音に対応 by [sevenc-nanashi](https://github.com/sevenc-nanashi)
+- 遅延読み込みに対応 by [sevenc-nanashi](https://github.com/sevenc-nanashi)
+
 ## 0.0.6
 
 - ビルドを良い感じにする by [sevenc-nanashi](https://github.com/sevenc-nanashi)
