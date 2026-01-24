@@ -3,23 +3,24 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy)]
 pub struct MidiNote(pub u8);
 
+#[allow(dead_code)]
 impl MidiNote {
-    // pub fn from_midi_number(midi_number: u8) -> Self {
-    //     Self(midi_number)
-    // }
+    pub fn from_midi_number(midi_number: u8) -> Self {
+        Self(midi_number)
+    }
 
-    // pub fn to_midi_number(self) -> u8 {
-    //     self.0
-    // }
+    pub fn to_midi_number(self) -> u8 {
+        self.0
+    }
 
     pub fn from_frequency(frequency: f32) -> Self {
         let midi_number = 69.0 + 12.0 * (frequency / 440.0).log2();
         Self(midi_number as u8)
     }
 
-    // pub fn to_frequency(self) -> f32 {
-    //     440.0 * 2.0_f32.powf((self.0 as f32 - 69.0) / 12.0)
-    // }
+    pub fn to_frequency(self) -> f32 {
+        440.0 * 2.0_f32.powf((self.0 as f32 - 69.0) / 12.0)
+    }
 }
 
 impl FromStr for MidiNote {
