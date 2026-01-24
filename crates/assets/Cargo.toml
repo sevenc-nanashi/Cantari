@@ -7,11 +7,11 @@ build = "build.rs"
 [dependencies]
 
 [build-dependencies]
-flate2 = "1.0.30"
-tar = "0.4.40"
-ureq = "2.9.7"
-rc-zip = "5.1.0"
-rc-zip-sync = "4.1.0"
-zip = "2.0.0"
+flate2 = "1.1.8"
+tar = "0.4.44"
+ureq = "3.1.4"
+rc-zip = "5.4.1"
+rc-zip-sync = "4.4.2"
+zip = "7.2.0"
 walkdir = "2.5.0"
 fs_extra = "1.3.0"

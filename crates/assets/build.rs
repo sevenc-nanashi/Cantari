@@ -9,6 +9,7 @@ mod tyc_utau {
         let mut zip = ureq::get("https://tyc.rei-yumesaki.net/files/voice/tyc-utau.zip")
             .call()
             .unwrap()
+            .into_body()
             .into_reader();
         let mut file = std::fs::File::create("assets/tyc-utau.zip.tmp").unwrap();
         std::io::copy(&mut zip, &mut file).unwrap();
@@ -49,9 +50,10 @@ mod open_jtalk_dict {
         if std::fs::metadata("assets/dict.tgz").is_ok() {
             return;
         }
-        let mut zip = ureq::get("https://jaist.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz")
+        let mut zip = ureq::get("https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz")
         .call()
         .unwrap()
+        .into_body()
         .into_reader();
         let mut file = std::fs::File::create("assets/dict.tgz.tmp").unwrap();
         std::io::copy(&mut zip, &mut file).unwrap();

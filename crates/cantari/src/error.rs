@@ -36,6 +36,8 @@ pub enum Error {
     SynthesisFailed(#[source] anyhow::Error),
     #[error("話者が見つかりませんでした")]
     SpeakerNotFound,
+    #[error("リクエストが不正です: {0}")]
+    InvalidRequest(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

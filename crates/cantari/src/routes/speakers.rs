@@ -3,7 +3,7 @@ use crate::ongen::ONGEN;
 use crate::settings::load_settings;
 
 use axum::{
-    extract::{Host, Path, Query},
+    extract::{Path, Query, Request},
     Json,
 };
 use base64::Engine as _;
@@ -34,10 +34,10 @@ pub struct VvStyleInfo {
     pub voice_samples: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SupportedFeatures {
-    pub permitted_synthesis_morphing: String,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct SupportedFeatures {
+//     pub permitted_synthesis_morphing: String,
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VvStyle {
@@ -99,11 +99,14 @@ pub struct SpeakerInfoQuery {
 
 pub async fn get_speaker_info(
     Query(query): axum::extract::Query<SpeakerInfoQuery>,
-    Host(host): Host,
+    request: Request<axum::body::Body>,
 ) -> Result<Json<VvSpeakerInfo>> {
     let ongens = ONGEN.get().unwrap().read().await;
     let settings = load_settings().await;
 
+    let Some(host) = request.headers().get("host").and_then(|h| h.to_str().ok()) else {
+        return Err(Error::InvalidRequest("Missing Host header".to_string()));
+    };
     let root = format!("http://{}", host);
 
     let speaker = ongens

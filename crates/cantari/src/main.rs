@@ -78,11 +78,11 @@ async fn main_impl(args: Cli) -> Result<()> {
             .route("/speakers", get(routes::speakers::get_speakers))
             .route("/speaker_info", get(routes::speakers::get_speaker_info))
             .route(
-                "/speaker_resources/icons/:uuid/:index",
+                "/speaker_resources/icons/{uuid}/{index}",
                 get(routes::speakers::get_icon),
             )
             .route(
-                "/speaker_resources/portraits/:uuid/:index",
+                "/speaker_resources/portraits/{uuid}/{index}",
                 get(routes::speakers::get_portrait),
             )
             .route(
@@ -107,11 +107,11 @@ async fn main_impl(args: Cli) -> Result<()> {
                 post(routes::user_dict::post_user_dict_word),
             )
             .route(
-                "/user_dict_word/:word_uuid",
+                "/user_dict_word/{word_uuid}",
                 delete(routes::user_dict::delete_user_dict_word),
             )
             .route(
-                "/user_dict_word/:word_uuid",
+                "/user_dict_word/{word_uuid}",
                 put(routes::user_dict::put_user_dict_word),
             )
             .route("/audio_query", post(routes::audio_query::post_audio_query))
@@ -123,7 +123,7 @@ async fn main_impl(args: Cli) -> Result<()> {
                 "/settings",
                 get(routes::settings::get_settings).put(routes::settings::put_settings),
             )
-            .route("/icons/:uuid", get(routes::settings::get_icon))
+            .route("/icons/{uuid}", get(routes::settings::get_icon))
             .layer(CorsLayer::permissive())
             .layer(
                 trace::TraceLayer::new_for_http()
@@ -168,9 +168,9 @@ async fn main_impl(args: Cli) -> Result<()> {
         info!("Launching browser...");
         open::that(format!("http://{}", addr))?;
     }
+    let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(async {
             tokio::signal::ctrl_c()
                 .await

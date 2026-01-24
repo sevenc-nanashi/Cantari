@@ -111,7 +111,7 @@ async fn modify_pitch(
     let ongens = ONGEN.get().unwrap().read().await;
     let settings = load_settings().await;
 
-    let (ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, speaker)
+    let (_ongen, style_settings) = get_ongen_style_from_id(&ongens, &settings, speaker)
         .await
         .ok_or_else(|| crate::error::Error::CharacterNotFound)?;
 

@@ -2,7 +2,7 @@ use crate::ongen_settings::StyleSettings;
 use crate::write_settings;
 use anyhow::{anyhow, bail, Result};
 use educe::Educe;
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use once_cell::sync::OnceCell;
 use regex_macro::regex;
 use serde::Serialize;
@@ -144,12 +144,14 @@ pub async fn setup_ongen() {
 
     let mut roots = vec![];
     for path in &settings.paths {
+        tracing::debug!("Scanning path: {:?}", path);
         for file in walkdir::WalkDir::new(path)
             .min_depth(1)
             .max_depth(3)
             .into_iter()
             .flatten()
         {
+            tracing::debug!("Found file: {:?}", file.path());
             if file.file_type().is_file() && file.file_name() == "character.txt" {
                 roots.push(file.path().parent().unwrap().to_path_buf());
             }
