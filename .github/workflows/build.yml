@@ -42,13 +42,12 @@ jobs:
       - info
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-14]
         include:
           - os: ubuntu-latest
             suffix: -linux
           - os: windows-latest
             suffix: -windows
-          - os: macos-13 # Intel Macにする
+          - os: macos-15-intel # Intel Macにする
             suffix: -macos
     runs-on: ${{ matrix.os }}
     steps:
